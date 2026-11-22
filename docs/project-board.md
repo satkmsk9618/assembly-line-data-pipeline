@@ -1,6 +1,6 @@
-# Starter project board
+# Project board
 
-Create a GitHub Project with these items and move each through Todo, In Progress, Review, and Done. Keep each pull request small enough to explain in a few sentences.
+Live board: [Assembly Line Data Pipeline](https://github.com/users/satkmsk9618/projects/2). The board is currently private to the account owner and contains draft tickets. The available statuses are Todo, In Progress, and Done. Keep each pull request small enough to explain in a few sentences.
 
 | Ticket | Acceptance check |
 |---|---|

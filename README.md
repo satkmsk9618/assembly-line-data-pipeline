@@ -73,7 +73,7 @@ The repository includes pytest checks for core cleaning and metric behavior. Run
 
 ## Pull request practice and project board
 
-Use a short branch for each feature, open a pull request, and write a review checklist even when reviewing your own work. The starter board is described in `docs/project-board.md`; create matching GitHub Project items as you work. A self-review is useful practice but should be described honestly as self-review.
+Use a short branch for each feature, open a pull request, and write a review checklist even when reviewing your own work. The [GitHub Project board](https://github.com/users/satkmsk9618/projects/2) tracks the features; its tickets and status are described in `docs/project-board.md`. The board is currently private to the account owner. A self-review is useful practice but should be described honestly as self-review.
 
 ## What I learned / next steps
 
