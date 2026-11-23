@@ -108,6 +108,15 @@ def main() -> None:
                     conn.execute("CREATE INDEX IF NOT EXISTS ix_event_end_ts ON fact_station_event (end_ts)")
                     conn.execute("CREATE INDEX IF NOT EXISTS ix_defect_recorded_ts ON fact_defect (recorded_ts)")
                     conn.execute("CREATE INDEX IF NOT EXISTS ix_downtime_end_ts ON fact_downtime (end_ts)")
+                    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_event_vehicle_station_time ON fact_station_event (vehicle_id, station_id, start_ts)")
+                    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_defect_natural_key ON fact_defect (vehicle_id, station_id, defect_id, recorded_ts)")
+                    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_downtime_natural_key ON fact_downtime (station_id, start_ts, end_ts, reason_code)")
+                    conn.execute("""CREATE TABLE IF NOT EXISTS report_preference (
+                        user_id TEXT PRIMARY KEY, report_email TEXT NOT NULL,
+                        timezone TEXT NOT NULL DEFAULT 'UTC',
+                        send_hour SMALLINT NOT NULL DEFAULT 9 CHECK(send_hour BETWEEN 0 AND 23),
+                        opted_in BOOLEAN NOT NULL DEFAULT FALSE, last_sent_local_date DATE,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
                 schema_ready = True
             LOGGER.info(json.dumps(produce_batch(rng)))
         except Exception as exc:  # Keep the demo stream alive if the DB restarts.

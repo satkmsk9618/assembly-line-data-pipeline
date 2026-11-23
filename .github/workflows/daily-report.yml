@@ -1,8 +1,8 @@
-name: Daily assembly line report
+name: Opt-in daily assembly line PDF reports
 
 on:
   schedule:
-    - cron: "0 9 * * *" # GitHub Actions schedules use UTC.
+    - cron: "0 * * * *" # Check hourly; each user chooses a local send hour.
   workflow_dispatch:
 
 permissions:
@@ -15,13 +15,13 @@ jobs:
       - name: Check email settings
         id: email_settings
         env:
-          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
           REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
           REPORT_SMTP_HOST: ${{ secrets.REPORT_SMTP_HOST }}
           REPORT_SMTP_USERNAME: ${{ secrets.REPORT_SMTP_USERNAME }}
           REPORT_SMTP_PASSWORD: ${{ secrets.REPORT_SMTP_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          if [[ -n "$REPORT_EMAIL_TO" && -n "$REPORT_EMAIL_FROM" && -n "$REPORT_SMTP_HOST" && -n "$REPORT_SMTP_USERNAME" && -n "$REPORT_SMTP_PASSWORD" ]]; then
+          if [[ -n "$DATABASE_URL" && -n "$REPORT_EMAIL_FROM" && -n "$REPORT_SMTP_HOST" && -n "$REPORT_SMTP_USERNAME" && -n "$REPORT_SMTP_PASSWORD" ]]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
@@ -34,24 +34,18 @@ jobs:
           python-version: "3.12"
       - name: Install project
         if: steps.email_settings.outputs.configured == 'true'
-        run: python -m pip install -e '.[dev]'
-      - name: Generate a recent simulated production sample
-        if: steps.email_settings.outputs.configured == 'true'
-        run: |
-          start_at="$(python -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(hours=70)).replace(microsecond=0).isoformat())')"
-          assembly-line generate --vehicles 1000 --seed "$GITHUB_RUN_NUMBER" --start-at "$start_at"
-          assembly-line run
-      - name: Email the 24-hour report
+        run: python -m pip install -e '.[dashboard,dev]'
+      - name: Send due opt-in PDF reports from PostgreSQL history
         if: steps.email_settings.outputs.configured == 'true'
         env:
-          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
           REPORT_SMTP_HOST: ${{ secrets.REPORT_SMTP_HOST }}
           REPORT_SMTP_PORT: ${{ vars.REPORT_SMTP_PORT || '587' }}
           REPORT_SMTP_SECURITY: ${{ vars.REPORT_SMTP_SECURITY || 'starttls' }}
           REPORT_SMTP_USERNAME: ${{ secrets.REPORT_SMTP_USERNAME }}
           REPORT_SMTP_PASSWORD: ${{ secrets.REPORT_SMTP_PASSWORD }}
-        run: python -m assembly_line.report --processed data/processed --window-hours 24
+        run: python -m assembly_line.scheduled_reports
       - name: Explain skipped delivery
         if: steps.email_settings.outputs.configured != 'true'
-        run: echo "Skipped email; add the REPORT_* SMTP repository secrets described in docs/daily-report.md."
+        run: echo "Skipped email; add DATABASE_URL and SMTP secrets described in docs/daily-report.md."

@@ -85,9 +85,11 @@ def dimensions():
 
 
 @app.get("/metrics/live-summary")
-def live_summary(hours: int = Query(default=1, ge=1, le=72)):
+def live_summary(hours: int = Query(default=1, ge=1, le=720), start_date: date | None = None,
+                 end_date: date | None = None):
     """Line-health indicators for the selected recent window."""
     with connect() as conn, conn.cursor() as cur:
+        where, params = _history_filter("end_ts", hours, start_date, end_date)
         cur.execute("""SELECT count(*) AS station_events,
             count(DISTINCT vehicle_id) AS vehicles,
             round(avg(cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
@@ -95,62 +97,77 @@ def live_summary(hours: int = Query(default=1, ge=1, le=72)):
             count(*) FILTER (WHERE status='rework') AS rework_events,
             round(100.0 * count(*) FILTER (WHERE status='rework') / NULLIF(count(*),0),2) AS rework_rate_pct,
             max(end_ts) AS latest_event_ts
-            FROM fact_station_event
-            WHERE end_ts >= now() - (%s * INTERVAL '1 hour')""", (hours,))
+            FROM fact_station_event""" + where, params)
         return dict(cur.fetchone())
 
 
 @app.get("/metrics/trend")
-def trend(hours: int = Query(default=6, ge=1, le=72)):
+def trend(hours: int = Query(default=6, ge=1, le=720), start_date: date | None = None,
+          end_date: date | None = None):
     """Five-minute throughput and cycle-time trend for recent operations."""
     with connect() as conn, conn.cursor() as cur:
+        where, params = _history_filter("end_ts", hours, start_date, end_date)
         cur.execute("""SELECT date_bin('5 minutes', end_ts, date_trunc('hour', now())) AS time_bucket,
             count(*) AS station_events, count(DISTINCT vehicle_id) AS vehicles,
             round(avg(cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
             count(*) FILTER (WHERE status='rework') AS rework_events
-            FROM fact_station_event
-            WHERE end_ts >= now() - (%s * INTERVAL '1 hour')
-            GROUP BY time_bucket ORDER BY time_bucket""", (hours,))
+            FROM fact_station_event""" + where + " GROUP BY time_bucket ORDER BY time_bucket", params)
         return [dict(row) for row in cur.fetchall()]
 
 
 @app.get("/metrics/station-health")
-def station_health(hours: int = Query(default=1, ge=1, le=72)):
+def station_health(hours: int = Query(default=1, ge=1, le=720), start_date: date | None = None,
+                   end_date: date | None = None):
     """Show which stations are slow or producing the most rework."""
     with connect() as conn, conn.cursor() as cur:
+        where, params = _history_filter("f.end_ts", hours, start_date, end_date)
         cur.execute("""SELECT f.station_id, count(*) AS events,
             round(avg(f.cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
             round(percentile_cont(0.9) WITHIN GROUP (ORDER BY f.cycle_time_minutes)::numeric,2) AS p90_cycle_minutes,
             count(*) FILTER (WHERE f.cycle_time_minutes > 8) AS over_takt_events,
             count(*) FILTER (WHERE f.status='rework') AS rework_events,
             round(100.0 * count(*) FILTER (WHERE f.status='rework') / NULLIF(count(*),0),2) AS rework_rate_pct
-            FROM fact_station_event f
-            WHERE f.end_ts >= now() - (%s * INTERVAL '1 hour')
-            GROUP BY f.station_id ORDER BY avg(f.cycle_time_minutes) DESC""", (hours,))
+            FROM fact_station_event f""" + where + " GROUP BY f.station_id ORDER BY avg(f.cycle_time_minutes) DESC", params)
         return [dict(row) for row in cur.fetchall()]
 
 
 @app.get("/metrics/quality")
-def quality(hours: int = Query(default=24, ge=1, le=720)):
+def quality(hours: int = Query(default=24, ge=1, le=720), start_date: date | None = None,
+            end_date: date | None = None):
     """Recent defect counts by type and severity for a Pareto-style view."""
     with connect() as conn, conn.cursor() as cur:
+        where, params = _history_filter("f.recorded_ts", hours, start_date, end_date)
         cur.execute("""SELECT d.defect_type, f.severity, count(*) AS defects,
             count(*) FILTER (WHERE f.rework_flag) AS rework_defects
-            FROM fact_defect f JOIN dim_defect d USING(defect_id)
-            WHERE f.recorded_ts >= now() - (%s * INTERVAL '1 hour')
-            GROUP BY d.defect_type, f.severity
-            ORDER BY count(*) DESC, d.defect_type""", (hours,))
+            FROM fact_defect f JOIN dim_defect d USING(defect_id)""" + where +
+            " GROUP BY d.defect_type, f.severity ORDER BY count(*) DESC, d.defect_type", params)
         return [dict(row) for row in cur.fetchall()]
 
 
 @app.get("/metrics/downtime")
-def downtime(hours: int = Query(default=24, ge=1, le=720)):
+def downtime(hours: int = Query(default=24, ge=1, le=720), start_date: date | None = None,
+             end_date: date | None = None):
     """Recent downtime minutes by station and stop reason."""
     with connect() as conn, conn.cursor() as cur:
+        where, params = _history_filter("end_ts", hours, start_date, end_date)
         cur.execute("""SELECT station_id, reason_code, count(*) AS stops,
             round(sum(extract(epoch FROM (end_ts - start_ts)) / 60)::numeric,1) AS downtime_minutes
-            FROM fact_downtime
-            WHERE end_ts >= now() - (%s * INTERVAL '1 hour')
-            GROUP BY station_id, reason_code
-            ORDER BY sum(extract(epoch FROM (end_ts - start_ts))) DESC""", (hours,))
+            FROM fact_downtime""" + where +
+            " GROUP BY station_id, reason_code ORDER BY sum(extract(epoch FROM (end_ts - start_ts))) DESC", params)
         return [dict(row) for row in cur.fetchall()]
+
+
+def _history_filter(column: str, hours: int, start_date: date | None, end_date: date | None):
+    """Return a safe SQL time predicate for a recent window or chosen dates."""
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
+    if start_date or end_date:
+        clauses, params = [], []
+        if start_date:
+            clauses.append(f"{column} >= %s::date")
+            params.append(start_date)
+        if end_date:
+            clauses.append(f"{column} < (%s::date + INTERVAL '1 day')")
+            params.append(end_date)
+        return " WHERE " + " AND ".join(clauses), params
+    return f" WHERE {column} >= now() - (%s * INTERVAL '1 hour')", [hours]

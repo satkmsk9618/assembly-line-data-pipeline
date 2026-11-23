@@ -9,13 +9,14 @@ I built an end-to-end pipeline that turns messy simulated assembly-line exports 
 3. Calculates cycle time, takt deviation, first-pass yield, and station bottleneck candidates.
 4. Loads the cleaned data into PostgreSQL tables arranged as a small star schema.
 5. Serves read-only metrics through FastAPI and displays them in Streamlit.
-6. Can email a daily summary of a fresh, simulated 24-hour sample through GitHub Actions.
+6. Keeps successive event loads in PostgreSQL so the dashboard can filter historical dates.
+7. Supports Supabase email/password accounts, downloadable daily PDF reports, and optional per-user daily email delivery.
 
 ## Hosted dashboard
 
-The Streamlit Community Cloud entrypoint is `src/assembly_line/dashboard.py`. Without an `API_URL`, it runs a self-contained demo simulator in the viewer's Streamlit session and refreshes its charts every 15 seconds. This hosted mode needs no local Docker setup, database, API credentials, or secrets. Its sample records are synthetic and session-local; they are not shared with the PostgreSQL database used by the Docker deployment.
+The Streamlit Community Cloud entrypoint is `src/assembly_line/dashboard.py`. With no database connection it runs a self-contained, session-local preview simulator and refreshes every 15 seconds. Set `DATABASE_URL` in the app's private secrets to use a persistent PostgreSQL event store; in that mode the app writes one shared simulated stream to the database and reads saved history from it. Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` to require verified email/password accounts. The server-side database URL must stay private.
 
-The [daily email report](docs/daily-report.md) runs separately from the Streamlit viewer. It generates a new synthetic sample once a day and emails the same project metrics; configure SMTP credentials as GitHub repository secrets.
+Users can download a detailed PDF for the selected reporting window. Signed-in users can optionally choose a daily report time and timezone; an hourly GitHub Actions job checks opted-in preferences and emails the completed local day as a PDF attachment. The report reads records already stored in PostgreSQL. See the [daily report and account setup](docs/daily-report.md).
 
 To deploy it, connect the public GitHub repository to [Streamlit Community Cloud](https://share.streamlit.io/), select branch `main` and file `src/assembly_line/dashboard.py`, then deploy. Streamlit Cloud reads the pinned dashboard dependencies from `requirements.txt`. The local Docker Compose setup remains available below when you want to inspect the ETL files, PostgreSQL schema, and FastAPI service.
 
@@ -38,7 +39,7 @@ source .venv/bin/activate
 python -m pip install -e '.[dashboard,dev]'
 ```
 
-The live demo stream starts automatically with Docker Compose and appends a new simulated vehicle every 15 seconds. The dashboard also refreshes every 15 seconds. You can open it immediately. The following optional batch commands generate a larger reproducible sample and load it into PostgreSQL:
+The live demo stream starts automatically with Docker Compose and appends a new simulated vehicle every 15 seconds. The dashboard refreshes every 15 seconds and can filter data by historical date. Each successive batch load appends new rows and skips previously loaded event keys; it no longer truncates the facts. You can generate and load a larger reproducible sample with:
 
 ```bash
 assembly-line generate --vehicles 1000 --seed 7
@@ -74,7 +75,7 @@ For more help, see [the troubleshooting notes](docs/version-1-troubleshooting.md
 
 Start with `station_events.csv`. Each record reports a vehicle, station, start and end timestamp, shift, and status. The generator shuffles the records as if machine exports arrived out of order and occasionally duplicates records or removes timestamps. `transform.clean_events` parses timestamps, calculates cycle time in minutes, removes exact duplicate keys, and rejects missing timestamps and cycles of zero or less. It returns row counts so the pipeline report explains what changed.
 
-The valid records are sorted by event time, station, and vehicle and saved under `data/processed/`. The summary is written to `metrics.json`. `assembly-line load` then replaces the demonstration facts inside one database transaction. This is deliberately simple and repeatable; a production pipeline would use incremental upserts, a load identifier, and a separate quarantine table.
+The valid records are sorted by event time, station, and vehicle and saved under `data/processed/`. The summary is written to `metrics.json`. `assembly-line load` appends new fact records in one database transaction and ignores rows with a previously loaded natural key. For a larger production system I would add explicit source batch IDs, quarantine tables, and retention rules.
 
 ## Metric definitions and assumptions
 
@@ -100,7 +101,7 @@ tests/               small deterministic unit tests for transformations
 - Python and Pandas keep the transformations readable for a first data-engineering project.
 - PostgreSQL makes the dimensional model and analytical SQL concrete.
 - One annual time partition plus a default partition demonstrates pruning while keeping the sample easy to load. At only thousands of rows, partitioning may not improve speed; query plans decide whether it helps.
-- The loader replaces the demo facts transactionally. It is easy to rerun but unsuitable for a continuously running factory feed.
+- The loader appends facts transactionally and skips duplicates, so old dashboard history remains available across runs.
 - The API exposes health, filter-dimension, summary, and station ranking endpoints. Summary and station results can be filtered by date range, station, and shift.
 - The dashboard refreshes every 15 seconds and shows throughput, takt misses, station rework, defect Pareto, and downtime.
 - A small simulator service appends clearly marked demo events every 15 seconds. It keeps the dashboard active without a real factory connection.
@@ -116,6 +117,10 @@ The repository includes pytest checks for core cleaning, metric behavior, and th
 ## Pull request practice and project board
 
 Use a short branch for each feature, open a pull request, and write a review checklist even when reviewing your own work. The [GitHub Project board](https://github.com/users/satkmsk9618/projects/2) tracks the features; its tickets and status are described in `docs/project-board.md`. The board is currently private to the account owner. A self-review is useful practice but should be described honestly as self-review.
+
+## Accounts, stored history, and reports
+
+The optional account flow uses Supabase Auth for verified email/password sign-in. PostgreSQL stores the shared simulated station, defect, and downtime records. Account email, time zone, send hour, and opt-in choice are stored in `report_preference`; no password or SMTP credential is stored there. The dashboard can select a historical date range and export a PDF with line summary, takt misses, station cycle/rework detail, defect severity, downtime causes, and interpretation notes.
 
 ## What I learned / next steps
 

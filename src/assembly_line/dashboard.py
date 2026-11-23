@@ -1,14 +1,19 @@
 """Live, problem-solving view of the simulated assembly line."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import os
+import threading
+from zoneinfo import ZoneInfo, available_timezones
 
 import pandas as pd
 import requests
 import streamlit as st
 
 from assembly_line import cloud_simulator
+from assembly_line.auth import auth_settings, current_user, make_client
+from assembly_line.db import connect, database_url
+from assembly_line.report_pdf import create_daily_pdf
 
 st.set_page_config(page_title="Assembly Line Control Room", page_icon="🚗", layout="wide")
 st.markdown("""
@@ -23,25 +28,134 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+auth_config = auth_settings()
+logged_in_user = None
+if auth_config:
+    auth_client = make_client(*auth_config)
+    logged_in_user = current_user(auth_client, st.session_state.get("auth_access_token", ""))
+    if not logged_in_user:
+        st.title("Assembly Line Dashboard")
+        st.write("Sign in to view saved production history and manage your daily report.")
+        login_tab, signup_tab = st.tabs(["Sign in", "Create account"])
+        with login_tab:
+            with st.form("sign_in_form"):
+                login_email = st.text_input("Email", key="login_email")
+                login_password = st.text_input("Password", type="password", key="login_password")
+                login_submit = st.form_submit_button("Sign in", type="primary")
+            if login_submit:
+                try:
+                    result = auth_client.auth.sign_in_with_password({"email": login_email, "password": login_password})
+                    st.session_state["auth_access_token"] = result.session.access_token
+                    st.rerun()
+                except Exception:
+                    st.error("Sign-in failed. Check your email and password, then try again.")
+        with signup_tab:
+            with st.form("sign_up_form"):
+                signup_email = st.text_input("Email", key="signup_email")
+                signup_password = st.text_input("Password (at least 8 characters)", type="password", key="signup_password")
+                signup_submit = st.form_submit_button("Create account")
+            if signup_submit:
+                if len(signup_password) < 8:
+                    st.error("Choose a password with at least 8 characters.")
+                else:
+                    try:
+                        result = auth_client.auth.sign_up({"email": signup_email, "password": signup_password})
+                        if result.session:
+                            st.session_state["auth_access_token"] = result.session.access_token
+                            st.rerun()
+                        st.success("Check your inbox to verify your email, then sign in here.")
+                    except Exception:
+                        st.error("Account creation failed. Check the email and try again.")
+        st.caption("Email confirmation should stay enabled in Supabase Auth. Passwords are handled by Supabase and are not stored by this app.")
+        st.stop()
+    st.sidebar.caption(f"Signed in as {logged_in_user.email}")
+    if st.sidebar.button("Sign out"):
+        st.session_state.pop("auth_access_token", None)
+        st.rerun()
+
+    try:
+        private_db_ready = bool(os.getenv("DATABASE_URL") or st.secrets.get("DATABASE_URL", ""))
+    except Exception:
+        private_db_ready = bool(os.getenv("DATABASE_URL"))
+    with st.sidebar.expander("Daily PDF email (optional)"):
+        if private_db_ready:
+            try:
+                with connect() as conn:
+                    row = conn.execute("SELECT timezone, send_hour, opted_in FROM report_preference WHERE user_id=%s", (str(logged_in_user.id),)).fetchone()
+                preference = dict(row) if row else {}
+                zones = sorted(available_timezones())
+                saved_zone = preference.get("timezone", "UTC")
+                selected_zone = st.selectbox("Time zone", zones, index=zones.index(saved_zone) if saved_zone in zones else zones.index("UTC"))
+                selected_hour = st.slider("Send time in your time zone", 0, 23, int(preference.get("send_hour", 9)))
+                opted_in = st.checkbox("Email me a daily report", value=bool(preference.get("opted_in", False)))
+                st.caption(f"The report goes to your account email: {logged_in_user.email}")
+                if st.button("Save email preference", key="save_email_preference"):
+                    inactive_through = datetime.now(ZoneInfo(selected_zone)).date() - timedelta(days=1)
+                    last_sent_day = None if opted_in else inactive_through
+                    with connect() as conn:
+                        conn.execute("""INSERT INTO report_preference(user_id, report_email, timezone, send_hour, opted_in, last_sent_local_date)
+                            VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (user_id) DO UPDATE SET
+                            report_email=EXCLUDED.report_email, timezone=EXCLUDED.timezone,
+                            send_hour=EXCLUDED.send_hour, opted_in=EXCLUDED.opted_in,
+                            last_sent_local_date=CASE WHEN EXCLUDED.opted_in THEN report_preference.last_sent_local_date ELSE EXCLUDED.last_sent_local_date END,
+                            updated_at=CURRENT_TIMESTAMP""",
+                            (str(logged_in_user.id), logged_in_user.email, selected_zone, selected_hour, opted_in, last_sent_day))
+                    st.success("Your daily report preference was saved.")
+            except Exception as exc:
+                st.warning(f"Report settings need the database schema to be installed. {exc}")
+        else:
+            st.info("Connect PostgreSQL to save your report preference. Email reports are optional.")
+
 st.title("🚗 Assembly Line Control Room")
 st.caption("A live operations view backed by a clearly labeled simulated event stream.")
 api_url = os.getenv("API_URL", "").rstrip("/")
-cloud_mode = not api_url
+persistent_mode = not api_url and bool(database_url())
+cloud_mode = not api_url and not persistent_mode
 REFRESH_SECONDS = 15
+
+
+@st.cache_resource
+def shared_persistent_simulator():
+    """One generator state per app process, shared safely across viewers."""
+    return {"state": {}, "lock": threading.Lock()}
 
 with st.sidebar:
     st.header("Dashboard settings")
-    hours = st.selectbox("Recent data window", [1, 6, 24], index=0, format_func=lambda n: f"Last {n} hour" if n == 1 else f"Last {n} hours")
+    data_view = st.radio("Data view", ["Recent", "Historical"])
+    hours = st.selectbox("Recent data window", [1, 6, 24, 72], index=0, format_func=lambda n: f"Last {n} hour" if n == 1 else f"Last {n} hours")
+    history_filters = {}
+    if data_view == "Historical":
+        history_start = st.date_input("From date", value=date.today())
+        history_end = st.date_input("Through date", value=date.today())
+        if history_start > history_end:
+            st.error("The start date must be on or before the end date.")
+            st.stop()
+        history_filters = {"start_date": history_start.isoformat(), "end_date": history_end.isoformat()}
     st.markdown("---")
     st.caption("Dashboard refreshes every 15 seconds.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
     if cloud_mode:
         st.caption("Hosted demo mode: the app generates its own sample events; PostgreSQL is not connected.")
+        if data_view == "Historical":
+            st.warning("This session has no persistent history. Configure API_URL to a PostgreSQL-backed API to browse saved dates.")
+            st.stop()
 
 
 def get_json(path: str, **params):
     if cloud_mode:
         return cloud_simulator.metrics(st.session_state, path, int(params.get("hours", 1)))
+    if persistent_mode:
+        from assembly_line import api as metrics_api
+        date_args = {key: date.fromisoformat(params[key]) for key in ("start_date", "end_date") if key in params}
+        hours_arg = int(params.get("hours", 1))
+        direct = {
+            "/metrics/live-summary": lambda: metrics_api.live_summary(hours=hours_arg, **date_args),
+            "/metrics/trend": lambda: metrics_api.trend(hours=hours_arg, **date_args),
+            "/metrics/station-health": lambda: metrics_api.station_health(hours=hours_arg, **date_args),
+            "/metrics/quality": lambda: metrics_api.quality(hours=hours_arg, **date_args),
+            "/metrics/downtime": lambda: metrics_api.downtime(hours=hours_arg, **date_args),
+        }
+        return direct[path]()
     response = requests.get(f"{api_url}{path}", params=params, timeout=8)
     response.raise_for_status()
     return response.json()
@@ -52,27 +166,39 @@ def show_empty(message: str) -> None:
 
 
 @st.fragment(run_every=REFRESH_SECONDS)
-def show_live_dashboard(window_hours: int):
-    if cloud_mode:
+def show_live_dashboard(window_hours: int, history: dict):
+    if cloud_mode and not history:
         cloud_simulator.advance(st.session_state)
+    if persistent_mode and not history:
+        shared = shared_persistent_simulator()
+        try:
+            with shared["lock"]:
+                cloud_simulator.advance(shared["state"])
+                cloud_simulator.persist_new_records(shared["state"])
+        except Exception as exc:
+            st.error(f"The persistent simulator could not write to PostgreSQL. Check DATABASE_URL and install sql/schema.sql. {exc}")
+            return
     try:
-        summary = get_json("/metrics/live-summary", hours=window_hours)
-        trend = get_json("/metrics/trend", hours=window_hours)
-        stations = get_json("/metrics/station-health", hours=window_hours)
-        quality = get_json("/metrics/quality", hours=max(1, window_hours))
-        downtime = get_json("/metrics/downtime", hours=max(1, window_hours))
-    except requests.RequestException as exc:
-        st.error(f"I could not reach the metrics API. Check that Docker Compose is running. Details: {exc}")
+        query = {"hours": window_hours, **history}
+        summary = get_json("/metrics/live-summary", **query)
+        trend = get_json("/metrics/trend", **query)
+        stations = get_json("/metrics/station-health", **query)
+        quality = get_json("/metrics/quality", **query)
+        downtime = get_json("/metrics/downtime", **query)
+    except Exception as exc:
+        st.error(f"I could not load the metrics. Check that the API or PostgreSQL database is running and configured. Details: {exc}")
         return
 
     latest = pd.to_datetime(summary.get("latest_event_ts"), utc=True, errors="coerce")
-    if pd.isna(latest):
+    if history:
+        st.markdown(f'<div class="source-note">Historical database records · {history["start_date"]} through {history["end_date"]}</div>', unsafe_allow_html=True)
+    elif pd.isna(latest):
         st.warning("No production events are loaded yet. The simulated feed should add the first events shortly.")
         age_seconds = None
     else:
         age_seconds = max(0, int((pd.Timestamp.now(tz="UTC") - latest).total_seconds()))
         if age_seconds <= 180:
-            source = "Hosted simulator" if cloud_mode else "Simulated feed"
+            source = "Hosted simulator" if cloud_mode else "Persistent simulated feed" if persistent_mode else "Simulated feed"
             st.markdown(f'<div class="source-note">● {source} is active · latest event {age_seconds} seconds ago · dashboard refreshes every {REFRESH_SECONDS}s</div>', unsafe_allow_html=True)
         else:
             st.warning(f"The most recent event is {age_seconds // 60} minutes old. Check the simulator service in Docker Compose.")
@@ -82,14 +208,22 @@ def show_live_dashboard(window_hours: int):
     avg_cycle = float(summary.get("avg_cycle_minutes") or 0)
     takt_misses = int(summary.get("events_over_takt") or 0)
     rework_pct = float(summary.get("rework_rate_pct") or 0)
-    rate = round(vehicles / window_hours, 1)
+    rate = round(vehicles / window_hours, 1) if not history else None
 
     metric_cols = st.columns(4)
-    metric_cols[0].metric("Vehicles", f"{vehicles:,}", f"{rate}/hour")
+    metric_cols[0].metric("Vehicles", f"{vehicles:,}", f"{rate}/hour" if rate is not None else None)
     metric_cols[1].metric("Station events", f"{events:,}")
     metric_cols[2].metric("Avg cycle", f"{avg_cycle:.2f} min", "vs 8 min takt" if avg_cycle else None)
     metric_cols[3].metric("Rework rate", f"{rework_pct:.1f}%", f"{int(summary.get('rework_events') or 0)} events")
     st.caption(f"{takt_misses:,} of {events:,} station events exceeded the 8-minute takt target.")
+    report_start = history.get("start_date", f"Last {window_hours} hours")
+    report_end = history.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
+    pdf = create_daily_pdf(summary=summary, stations=stations, quality=quality, downtime=downtime,
+                           start=report_start, end=report_end,
+                           source="Stored simulated production data" if history else "Live simulated production data")
+    st.download_button("Download detailed report (PDF)", pdf,
+                       file_name=f"assembly-line-report-{history.get('start_date', date.today().isoformat())}.pdf",
+                       mime="application/pdf", key="download_daily_report")
 
     overview, quality_tab, downtime_tab = st.tabs(["Line overview", "Quality", "Downtime"])
     with overview:
@@ -168,7 +302,9 @@ def show_live_dashboard(window_hours: int):
                 st.bar_chart(by_station.set_index("station_id"), y_label="Downtime (minutes)", height=300)
             st.dataframe(downtime_frame, width="stretch", hide_index=True)
 
-    st.caption(f"Data window: last {window_hours} hour(s) · last checked {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}")
+    caption = (f"Historical window: {history['start_date']} through {history['end_date']}" if history
+               else f"Data window: last {window_hours} hour(s)")
+    st.caption(f"{caption} · last checked {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}")
 
 
-show_live_dashboard(hours)
+show_live_dashboard(hours, history_filters)

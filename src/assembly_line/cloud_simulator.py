@@ -31,6 +31,7 @@ def _vehicle(rng: random.Random, vehicle_id: str, completed_at: datetime):
         events.append({
             "vehicle_id": vehicle_id,
             "station_id": station_id,
+            "operator_shift": shift,
             "start_ts": start_ts,
             "end_ts": end_ts,
             "cycle_time_minutes": cycle,
@@ -52,10 +53,11 @@ def _vehicle(rng: random.Random, vehicle_id: str, completed_at: datetime):
 def _seed(state: MutableMapping) -> None:
     rng = random.Random(9618)
     now = datetime.now(timezone.utc).replace(microsecond=0)
+    run_id = now.strftime("%Y%m%d%H%M%S")
     events, defects, downtime = [], [], []
     for number in range(1, 37):
         completed_at = now - timedelta(hours=6) + timedelta(minutes=number * 10)
-        batch, batch_defects = _vehicle(rng, f"CLOUD-{number:04d}", completed_at)
+        batch, batch_defects = _vehicle(rng, f"CLOUD-{run_id}-{number:04d}", completed_at)
         events.extend(batch)
         defects.extend(batch_defects)
         if rng.random() < 0.4:
@@ -71,6 +73,7 @@ def _seed(state: MutableMapping) -> None:
     state["cloud_downtime"] = downtime
     state["cloud_last_batch"] = now
     state["cloud_vehicle_number"] = 36
+    state["cloud_run_id"] = run_id
     state["cloud_rng_state"] = rng.getstate()
 
 
@@ -87,7 +90,7 @@ def advance(state: MutableMapping, now: datetime | None = None) -> bool:
     rng.setstate(state["cloud_rng_state"])
     state["cloud_vehicle_number"] += 1
     number = state["cloud_vehicle_number"]
-    batch, defects = _vehicle(rng, f"CLOUD-{number:04d}", now)
+    batch, defects = _vehicle(rng, f"CLOUD-{state['cloud_run_id']}-{number:04d}", now)
     state["cloud_events"].extend(batch)
     state["cloud_defects"].extend(defects)
     if rng.random() < 0.18:
@@ -101,6 +104,50 @@ def advance(state: MutableMapping, now: datetime | None = None) -> bool:
     state["cloud_last_batch"] = now
     state["cloud_rng_state"] = rng.getstate()
     return True
+
+
+def persist_new_records(state: MutableMapping) -> int:
+    """Append simulator records created since this shared state was last saved."""
+    from assembly_line.db import connect
+
+    event_offset = int(state.get("cloud_persisted_event_count", 0))
+    defect_offset = int(state.get("cloud_persisted_defect_count", 0))
+    downtime_offset = int(state.get("cloud_persisted_downtime_count", 0))
+    events = state.get("cloud_events", [])[event_offset:]
+    defects = state.get("cloud_defects", [])[defect_offset:]
+    stops = state.get("cloud_downtime", [])[downtime_offset:]
+    if not events and not defects and not stops:
+        return 0
+
+    with connect() as conn, conn.cursor() as cur:
+        for station_id in STATIONS:
+            cur.execute("INSERT INTO dim_station(station_id, station_name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (station_id, f"Assembly station {station_id[-2:]}"))
+        for row in events:
+            shift = row["operator_shift"]
+            cur.execute("INSERT INTO dim_shift(shift_name) VALUES (%s) ON CONFLICT DO NOTHING", (shift,))
+            cur.execute("""INSERT INTO fact_station_event
+                (vehicle_id, station_id, shift_id, start_ts, end_ts, cycle_time_minutes, status)
+                SELECT %s, s.station_id, sh.shift_id, %s, %s, %s, %s
+                FROM dim_station s CROSS JOIN dim_shift sh
+                WHERE s.station_id=%s AND sh.shift_name=%s ON CONFLICT DO NOTHING""",
+                (row["vehicle_id"], row["start_ts"], row["end_ts"], row["cycle_time_minutes"],
+                 row["status"], row["station_id"], shift))
+        for row in defects:
+            cur.execute("INSERT INTO dim_defect(defect_type) VALUES (%s) ON CONFLICT DO NOTHING", (row["defect_type"],))
+            cur.execute("""INSERT INTO fact_defect(vehicle_id, station_id, defect_id, severity, rework_flag, recorded_ts)
+                SELECT %s, s.station_id, d.defect_id, %s, %s, %s FROM dim_station s CROSS JOIN dim_defect d
+                WHERE s.station_id=%s AND d.defect_type=%s ON CONFLICT DO NOTHING""",
+                (row["vehicle_id"], row["severity"], row["rework_flag"], row["recorded_ts"],
+                 row["station_id"], row["defect_type"]))
+        for row in stops:
+            cur.execute("""INSERT INTO fact_downtime(station_id, start_ts, end_ts, reason_code)
+                VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+                (row["station_id"], row["start_ts"], row["end_ts"], row["reason_code"]))
+    state["cloud_persisted_event_count"] = len(state.get("cloud_events", []))
+    state["cloud_persisted_defect_count"] = len(state.get("cloud_defects", []))
+    state["cloud_persisted_downtime_count"] = len(state.get("cloud_downtime", []))
+    return len(events)
 
 
 def metrics(state: MutableMapping, path: str, hours: int = 1):

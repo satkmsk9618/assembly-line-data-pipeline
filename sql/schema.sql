@@ -57,3 +57,23 @@ CREATE INDEX IF NOT EXISTS ix_defect_station ON fact_defect (station_id);
 CREATE INDEX IF NOT EXISTS ix_defect_recorded_ts ON fact_defect (recorded_ts);
 CREATE INDEX IF NOT EXISTS ix_downtime_station_start ON fact_downtime (station_id, start_ts);
 CREATE INDEX IF NOT EXISTS ix_downtime_end_ts ON fact_downtime (end_ts);
+
+-- Keep successive simulator/ETL loads as history rather than replacing the table.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_event_vehicle_station_time
+    ON fact_station_event (vehicle_id, station_id, start_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_defect_natural_key
+    ON fact_defect (vehicle_id, station_id, defect_id, recorded_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_downtime_natural_key
+    ON fact_downtime (station_id, start_ts, end_ts, reason_code);
+
+-- The Streamlit server uses the verified Supabase Auth user ID to store one
+-- personal email preference. No password or SMTP credential is stored here.
+CREATE TABLE IF NOT EXISTS report_preference (
+    user_id TEXT PRIMARY KEY,
+    report_email TEXT NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    send_hour SMALLINT NOT NULL DEFAULT 9 CHECK (send_hour BETWEEN 0 AND 23),
+    opted_in BOOLEAN NOT NULL DEFAULT FALSE,
+    last_sent_local_date DATE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

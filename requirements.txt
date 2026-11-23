@@ -1,2 +1,4 @@
 -e .[dashboard]
 streamlit==1.50.0
+supabase>=2.15,<3
+reportlab>=4.2,<5

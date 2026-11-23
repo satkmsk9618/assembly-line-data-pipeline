@@ -1,29 +1,41 @@
-# Daily email report
+# Accounts, historical data, and daily PDF reports
 
-The project can email a summary every day using the scheduled GitHub Actions workflow in `.github/workflows/daily-report.yml`. Each run creates a fresh synthetic sample, cleans it with the same ETL code, selects vehicles by their line-completion time in the trailing 24 hours, and emails a plain-text and HTML report. The sample is generated for the report; it is not read from a Streamlit browser session or a real factory feed.
+## What the report shows
 
-## Configure delivery
+The report is created from records already stored in PostgreSQL for one complete calendar day in the user's chosen time zone. It includes the reporting window and source, vehicle and station-event counts, average cycle time, first-pass yield, rework and takt misses, station-level cycle and rework detail, defect type/severity, and downtime reason and duration. It also explains that long cycles are investigation candidates rather than proof of a bottleneck. Users can download a PDF for the current or historical date range from the dashboard.
 
-For Gmail, I configured the SMTP host as `smtp.gmail.com`, the username and sender as the Gmail address, and port `587` with STARTTLS. The recipient and non-password SMTP settings are stored in the repository's Actions secrets/variables. Add the remaining sender credential under **Settings → Secrets and variables → Actions → New repository secret**:
+The database remains the detailed history. The PDF is a shareable snapshot of the same stored data. Metrics are calculated by the same project logic as the dashboard; missing metrics are shown as zero or no data rather than inferred. This project currently stores simulated events, not factory telemetry.
 
-| Secret | Purpose |
-|---|---|
-| `REPORT_SMTP_PASSWORD` | SMTP password or provider app password |
+## Free hosted setup
 
-For a Gmail account, use a Google app password for SMTP authentication rather than your regular account password. If you switch providers or use implicit TLS, update the GitHub settings `REPORT_SMTP_HOST`, `REPORT_SMTP_USERNAME`, `REPORT_EMAIL_FROM`, `REPORT_SMTP_PORT`, and, when needed, `REPORT_SMTP_SECURITY=ssl`. The security mode accepts `starttls` or `ssl`. Keep the provider password in GitHub Secrets; never add it to this repository or a Streamlit secrets file.
+Supabase offers a free project with a PostgreSQL database and Auth. The current Free plan lists 500 MB of database storage and 50,000 monthly active users; free projects can pause after one week without activity, so it is suitable for a portfolio demo rather than a production availability promise. Check [Supabase pricing](https://supabase.com/pricing) for current limits.
 
-The schedule runs once each day at **09:00 UTC**. GitHub Actions can delay scheduled runs during heavy load. The workflow can also be started manually from the repository's **Actions** tab after all secrets have been configured.
+1. Create a Supabase project and leave email confirmation enabled in **Authentication → Providers → Email**.
+2. In Supabase **SQL Editor**, run the complete contents of `sql/schema.sql` to create the event tables, indexes, and report-preference table.
+3. Copy the Project URL and anon/publishable key from **Project Settings → API**. Copy a PostgreSQL connection string from **Project Settings → Database**.
+4. In the Streamlit app's **Settings → Secrets**, set:
 
-## Report contents
+   ```toml
+   SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+   SUPABASE_ANON_KEY = "YOUR_PUBLIC_ANON_KEY"
+   DATABASE_URL = "postgresql://..."
+   ```
 
-The report includes the time window, vehicle and station-event counts, average cycle time, first-pass yield, defect count, downtime events and minutes, bottleneck candidate, and a station-by-station cycle/rework table. All values come from the generated sample and should be described as simulated results.
+   `DATABASE_URL` is private server configuration. Never use a service-role key as the anon key and never commit database credentials. The app shows the sign-in/create-account page when Supabase Auth is configured.
+5. Keep `API_URL` unset for the Streamlit hosted mode. With `DATABASE_URL`, the app's shared simulator writes new synthetic station, defect, and downtime events to PostgreSQL every 15 seconds. The Streamlit server runs the simulator only while the app is active; this demo does not promise continuous ingestion when nobody is viewing it.
+6. To enable email delivery, add `DATABASE_URL`, `REPORT_EMAIL_FROM`, `REPORT_SMTP_HOST`, `REPORT_SMTP_USERNAME`, and `REPORT_SMTP_PASSWORD` as GitHub repository Actions secrets. Add `REPORT_SMTP_PORT` and `REPORT_SMTP_SECURITY` as Actions variables if they differ from `587` and `starttls`. The workflow checks every hour and sends a report only for accounts that opted in and whose chosen local send time has passed.
+7. Sign in with a verified account, open **Daily PDF email (optional)**, choose a time zone and local send hour, then turn on **Email me a daily report**. The report is sent to that account's verified email. Uncheck the option and save to opt out.
 
-## Run the report locally
+If the initial Compose database was created before this feature, the simulator applies the report preference table and natural-key indexes on startup. For a managed Supabase project, running the full schema is the simplest setup.
 
-After generating and cleaning data, this command writes a report JSON file without sending an email:
+## Local Docker setup
 
-```bash
-python -m assembly_line.report --processed data/processed --window-hours 24 --output data/processed/daily-report.json
-```
+The default Compose stack still uses local PostgreSQL and a simulator service. It writes a persistent shared event history and exposes it through FastAPI. The dashboard's **Historical** view selects inclusive calendar dates. `assembly-line load` now appends rows and ignores duplicate station event keys rather than truncating existing facts. `docker compose down -v` deletes that local history.
 
-To test delivery, set the same `REPORT_*` environment variables in your shell and run the command without `--output`. Do not commit those environment values.
+Supabase Auth is optional locally. Add the project URL and anon key to `.env` to turn on the login screen. Keep `.env` private. The optional email preference can be exercised against the local Postgres database, but automated email delivery requires the GitHub Actions secrets described above.
+
+## Privacy and limits
+
+Passwords are handled by Supabase Auth and are not stored in the project database. The project stores each account's email, time zone, desired send hour, opt-in status, and last sent report date in `report_preference`. Event facts in this demo are shared simulated line data. A real multi-company product would add tenant ownership and authorization policies before storing customer event data.
+
+PostgreSQL remains the system of record. PDFs are generated on demand or by the scheduled job; the job does not create invented events to fill an empty day. A day with no records produces an honest no-data summary.
