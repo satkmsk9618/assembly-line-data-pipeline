@@ -251,6 +251,15 @@ def show_empty(message: str) -> None:
     st.info(message)
 
 
+def numeric_metric(values: pd.Series) -> pd.Series:
+    """Normalize numeric metrics returned as JSON/DB strings for charting."""
+    text = (values.astype("string").str.strip()
+            .str.replace('"', "", regex=False)
+            .str.replace("\\", "", regex=False)
+            .str.replace(",", "", regex=False))
+    return pd.to_numeric(text, errors="coerce")
+
+
 @st.fragment(run_every=REFRESH_SECONDS if auto_refresh and not history_filters else None)
 def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: bool):
     if cloud_mode and not history:
@@ -314,6 +323,9 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
         if trend_frame.empty:
             show_empty("Waiting for recent events to build the trend charts.")
         else:
+            for metric in ("vehicles", "avg_cycle_minutes"):
+                if metric in trend_frame:
+                    trend_frame[metric] = numeric_metric(trend_frame[metric])
             trend_frame["time_bucket"] = pd.to_datetime(trend_frame["time_bucket"], utc=True).dt.tz_convert(None)
             trend_frame = trend_frame.set_index("time_bucket").sort_index()
             with left:
@@ -327,11 +339,11 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
                 else:
                     st.line_chart(trend_frame[["vehicles"]], y_label="Vehicles per 5 minutes", height=280)
             with right:
-                st.subheader("Cycle time over the shift")
+                st.subheader("Average cycle time by time bucket")
                 if show_all_time:
                     st.bar_chart(trend_frame[["avg_cycle_minutes"]], y_label="Average cycle per day (minutes)", height=280)
                 else:
-                    st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Minutes", height=280)
+                    st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Average cycle time (minutes)", height=280)
 
         station_frame = pd.DataFrame(stations)
         st.subheader("Which station needs attention?")
@@ -339,6 +351,9 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
         if station_frame.empty:
             show_empty("No station events in this time window yet.")
         else:
+            for metric in ("avg_cycle_minutes", "p90_cycle_minutes", "over_takt_events", "rework_events", "rework_rate_pct"):
+                if metric in station_frame:
+                    station_frame[metric] = numeric_metric(station_frame[metric])
             top_over_takt = station_frame.sort_values("over_takt_events", ascending=False).iloc[0]
             if int(top_over_takt["over_takt_events"]) > 0:
                 st.warning(f"Investigate {top_over_takt['station_id']} first: it has {int(top_over_takt['over_takt_events'])} events over the 8-minute takt target in this window.")
@@ -387,11 +402,7 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
             # strings. Convert before groupby.sum(), or Pandas concatenates
             # them (for example, "58" + "80" becomes "5880") and Streamlit
             # renders the axis as categories instead of minutes.
-            minutes_text = (downtime_frame["downtime_minutes"].astype("string").str.strip()
-                            .str.replace('"', "", regex=False)
-                            .str.replace("\\", "", regex=False)
-                            .str.replace(",", "", regex=False))
-            downtime_frame["downtime_minutes"] = pd.to_numeric(minutes_text, errors="coerce")
+            downtime_frame["downtime_minutes"] = numeric_metric(downtime_frame["downtime_minutes"])
             downtime_frame = downtime_frame.dropna(subset=["downtime_minutes"])
             if downtime_frame.empty:
                 show_empty("Downtime records were returned, but their minute values are not numeric.")
