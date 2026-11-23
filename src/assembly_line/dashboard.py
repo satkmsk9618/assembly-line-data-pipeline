@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 import os
 import threading
+import time
 from zoneinfo import ZoneInfo, available_timezones
 
 import pandas as pd
@@ -121,7 +122,25 @@ REFRESH_SECONDS = 15
 @st.cache_resource
 def shared_persistent_simulator():
     """One generator state per app process, shared safely across viewers."""
-    return {"state": {}, "lock": threading.Lock()}
+    shared = {"state": {}, "lock": threading.Lock(), "thread_lock": threading.Lock(), "last_error": None}
+
+    def generate_forever():
+        # Keep the hosted feed moving independently of browser reruns. This avoids
+        # coupling database writes to Streamlit's page refresh cycle.
+        while True:
+            try:
+                with shared["lock"]:
+                    cloud_simulator.advance(shared["state"])
+                    cloud_simulator.persist_new_records(shared["state"])
+                    shared["last_error"] = None
+            except Exception as exc:  # keep retrying after transient DB/network errors
+                shared["last_error"] = str(exc)
+            time.sleep(REFRESH_SECONDS)
+
+    with shared["thread_lock"]:
+        thread = threading.Thread(target=generate_forever, name="assembly-line-generator", daemon=True)
+        thread.start()
+    return shared
 
 with st.sidebar:
     st.header("Dashboard settings")
@@ -137,7 +156,7 @@ with st.sidebar:
         history_filters = {"start_date": history_start.isoformat(), "end_date": history_end.isoformat()}
     auto_refresh = False
     if data_view == "Recent":
-        auto_refresh = st.toggle("Auto-refresh every 15 seconds", value=True, key="dashboard_auto_refresh")
+        auto_refresh = st.toggle("Auto-refresh every 15 seconds", value=False, key="dashboard_auto_refresh_v2")
         if not auto_refresh and st.button("Refresh dashboard now"):
             st.rerun()
     else:
@@ -145,6 +164,8 @@ with st.sidebar:
     st.markdown("---")
     if data_view == "Recent":
         st.caption("Auto-refresh is on." if auto_refresh else "Auto-refresh is paused.")
+        if persistent_mode and not auto_refresh:
+            st.caption("New simulated records are still saved every 15 seconds. Use Refresh dashboard now to load the latest view.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
     if cloud_mode:
         st.caption("Hosted demo mode: the app generates its own sample events; PostgreSQL is not connected.")
@@ -183,13 +204,8 @@ def show_live_dashboard(window_hours: int, history: dict):
         cloud_simulator.advance(st.session_state)
     if persistent_mode and not history:
         shared = shared_persistent_simulator()
-        try:
-            with shared["lock"]:
-                cloud_simulator.advance(shared["state"])
-                cloud_simulator.persist_new_records(shared["state"])
-        except Exception as exc:
-            st.error(f"The persistent simulator could not write to PostgreSQL. Check DATABASE_URL and install sql/schema.sql. {exc}")
-            return
+        if shared["last_error"]:
+            st.warning(f"The background simulator could not save its latest batch. It will retry automatically. Details: {shared['last_error']}")
     try:
         query = {"hours": window_hours, **history}
         summary = get_json("/metrics/live-summary", **query)
