@@ -32,7 +32,8 @@ auth_config = auth_settings()
 logged_in_user = None
 if auth_config:
     auth_client = make_client(*auth_config)
-    logged_in_user = current_user(auth_client, st.session_state.get("auth_access_token", ""))
+    logged_in_user = current_user(auth_client, st.session_state.get("auth_access_token", ""),
+                                  st.session_state.get("auth_refresh_token", ""))
     if not logged_in_user:
         st.title("Assembly Line Dashboard")
         st.write("Sign in to view saved production history and manage your daily report.")
@@ -46,6 +47,7 @@ if auth_config:
                 try:
                     result = auth_client.auth.sign_in_with_password({"email": login_email, "password": login_password})
                     st.session_state["auth_access_token"] = result.session.access_token
+                    st.session_state["auth_refresh_token"] = result.session.refresh_token
                     st.rerun()
                 except Exception:
                     st.error("Sign-in failed. Check your email and password, then try again.")
@@ -62,6 +64,7 @@ if auth_config:
                         result = auth_client.auth.sign_up({"email": signup_email, "password": signup_password})
                         if result.session:
                             st.session_state["auth_access_token"] = result.session.access_token
+                            st.session_state["auth_refresh_token"] = result.session.refresh_token
                             st.rerun()
                         st.success("Check your inbox to verify your email, then sign in here.")
                     except Exception:
@@ -71,6 +74,7 @@ if auth_config:
     st.sidebar.caption(f"Signed in as {logged_in_user.email}")
     if st.sidebar.button("Sign out"):
         st.session_state.pop("auth_access_token", None)
+        st.session_state.pop("auth_refresh_token", None)
         st.rerun()
 
     try:

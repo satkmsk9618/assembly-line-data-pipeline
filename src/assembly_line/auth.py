@@ -25,12 +25,21 @@ def make_client(url: str, anon_key: str) -> Client:
     return create_client(url, anon_key)
 
 
-def current_user(client: Client, access_token: str):
-    """Validate a saved access token against Supabase Auth."""
+def current_user(client: Client, access_token: str, refresh_token: str = ""):
+    """Validate a saved token and refresh it when an app session has expired."""
     if not access_token:
         return None
     try:
         return client.auth.get_user(access_token).user
+    except Exception:
+        if not refresh_token:
+            return None
+    try:
+        refreshed = client.auth.refresh_session(refresh_token)
+        import streamlit as st
+        st.session_state["auth_access_token"] = refreshed.session.access_token
+        st.session_state["auth_refresh_token"] = refreshed.session.refresh_token
+        return refreshed.user
     except Exception:
         return None
 
