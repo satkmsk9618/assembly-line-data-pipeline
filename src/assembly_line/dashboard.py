@@ -189,7 +189,12 @@ def shared_persistent_simulator():
 with st.sidebar:
     st.header("Dashboard settings")
     data_view = st.radio("Data view", ["Recent", "Historical"])
-    hours = st.selectbox("Recent data window", [1, 6, 24, 72], index=0, format_func=lambda n: f"Last {n} hour" if n == 1 else f"Last {n} hours")
+    window = st.selectbox(
+        "Recent data window", [1, 6, 24, 72, "All time"], index=0,
+        format_func=lambda value: value if value == "All time" else f"Last {value} hour" if value == 1 else f"Last {value} hours",
+    )
+    all_time = window == "All time"
+    hours = None if all_time else int(window)
     history_filters = {}
     if data_view == "Historical":
         history_start = st.date_input("From date", value=date.today())
@@ -220,17 +225,18 @@ with st.sidebar:
 
 def get_json(path: str, **params):
     if cloud_mode:
-        return cloud_simulator.metrics(st.session_state, path, int(params.get("hours", 1)))
+        return cloud_simulator.metrics(st.session_state, path, int(params.get("hours") or 1), bool(params.get("all_time", False)))
     if persistent_mode:
         from assembly_line import api as metrics_api
         date_args = {key: date.fromisoformat(params[key]) for key in ("start_date", "end_date") if key in params}
-        hours_arg = int(params.get("hours", 1))
+        hours_arg = int(params.get("hours") or 1)
+        all_time_arg = bool(params.get("all_time", False))
         direct = {
-            "/metrics/live-summary": lambda: metrics_api.live_summary(hours=hours_arg, **date_args),
-            "/metrics/trend": lambda: metrics_api.trend(hours=hours_arg, **date_args),
-            "/metrics/station-health": lambda: metrics_api.station_health(hours=hours_arg, **date_args),
-            "/metrics/quality": lambda: metrics_api.quality(hours=hours_arg, **date_args),
-            "/metrics/downtime": lambda: metrics_api.downtime(hours=hours_arg, **date_args),
+            "/metrics/live-summary": lambda: metrics_api.live_summary(hours=hours_arg, all_time=all_time_arg, **date_args),
+            "/metrics/trend": lambda: metrics_api.trend(hours=hours_arg, all_time=all_time_arg, **date_args),
+            "/metrics/station-health": lambda: metrics_api.station_health(hours=hours_arg, all_time=all_time_arg, **date_args),
+            "/metrics/quality": lambda: metrics_api.quality(hours=hours_arg, all_time=all_time_arg, **date_args),
+            "/metrics/downtime": lambda: metrics_api.downtime(hours=hours_arg, all_time=all_time_arg, **date_args),
         }
         return direct[path]()
     response = requests.get(f"{api_url}{path}", params=params, timeout=8)
@@ -243,7 +249,7 @@ def show_empty(message: str) -> None:
 
 
 @st.fragment(run_every=REFRESH_SECONDS if auto_refresh and not history_filters else None)
-def show_live_dashboard(window_hours: int, history: dict):
+def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: bool):
     if cloud_mode and not history:
         cloud_simulator.advance(st.session_state)
     if persistent_mode and not history:
@@ -251,7 +257,7 @@ def show_live_dashboard(window_hours: int, history: dict):
         if shared["last_error"]:
             st.warning(f"The background simulator could not save its latest batch. It will retry automatically. Details: {shared['last_error']}")
     try:
-        query = {"hours": window_hours, **history}
+        query = ({"all_time": True} if show_all_time and not history else {"hours": window_hours}) | history
         summary = get_json("/metrics/live-summary", **query)
         trend = get_json("/metrics/trend", **query)
         stations = get_json("/metrics/station-health", **query)
@@ -281,7 +287,7 @@ def show_live_dashboard(window_hours: int, history: dict):
     avg_cycle = float(summary.get("avg_cycle_minutes") or 0)
     takt_misses = int(summary.get("events_over_takt") or 0)
     rework_pct = float(summary.get("rework_rate_pct") or 0)
-    rate = round(vehicles / window_hours, 1) if not history else None
+    rate = round(vehicles / window_hours, 1) if not history and not show_all_time else None
 
     metric_cols = st.columns(4)
     metric_cols[0].metric("Vehicles", f"{vehicles:,}", f"{rate}/hour" if rate is not None else None)
@@ -289,7 +295,7 @@ def show_live_dashboard(window_hours: int, history: dict):
     metric_cols[2].metric("Avg cycle", f"{avg_cycle:.2f} min", "vs 8 min takt" if avg_cycle else None)
     metric_cols[3].metric("Rework rate", f"{rework_pct:.1f}%", f"{int(summary.get('rework_events') or 0)} events")
     st.caption(f"{takt_misses:,} of {events:,} station events exceeded the 8-minute takt target.")
-    report_start = history.get("start_date", f"Last {window_hours} hours")
+    report_start = history.get("start_date", "All time" if show_all_time else f"Last {window_hours} hours")
     report_end = history.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
     pdf = create_daily_pdf(summary=summary, stations=stations, quality=quality, downtime=downtime,
                            start=report_start, end=report_end,
@@ -309,10 +315,10 @@ def show_live_dashboard(window_hours: int, history: dict):
             trend_frame = trend_frame.set_index("time_bucket").sort_index()
             with left:
                 st.subheader("Production pace")
-                st.line_chart(trend_frame[["vehicles"]], y_label="Vehicles per 5 minutes", height=280)
+                st.line_chart(trend_frame[["vehicles"]], y_label="Vehicles per day" if show_all_time else "Vehicles per 5 minutes", height=280)
             with right:
                 st.subheader("Cycle time over the shift")
-                st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Minutes", height=280)
+                st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Average cycle per day (minutes)" if show_all_time else "Minutes", height=280)
 
         station_frame = pd.DataFrame(stations)
         st.subheader("Which station needs attention?")
@@ -376,8 +382,9 @@ def show_live_dashboard(window_hours: int, history: dict):
             st.dataframe(downtime_frame, width="stretch", hide_index=True)
 
     caption = (f"Historical window: {history['start_date']} through {history['end_date']}" if history
+               else "Data window: all stored records" if show_all_time
                else f"Data window: last {window_hours} hour(s)")
     st.caption(f"{caption} · last checked {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}")
 
 
-show_live_dashboard(hours, history_filters)
+show_live_dashboard(hours, history_filters, all_time)

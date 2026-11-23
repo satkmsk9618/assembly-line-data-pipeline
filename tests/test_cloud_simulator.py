@@ -18,6 +18,18 @@ def test_cloud_demo_starts_with_recent_station_and_quality_metrics():
     assert downtime
 
 
+def test_cloud_demo_all_time_includes_complete_generated_history():
+    state = {}
+
+    all_time = cloud_simulator.metrics(state, "/metrics/live-summary", hours=1, all_time=True)
+    recent = cloud_simulator.metrics(state, "/metrics/live-summary", hours=1)
+    all_time_trend = cloud_simulator.metrics(state, "/metrics/trend", hours=1, all_time=True)
+
+    assert all_time["station_events"] == 36 * len(cloud_simulator.STATIONS)
+    assert all_time["station_events"] > recent["station_events"]
+    assert all_time_trend
+
+
 def test_cloud_demo_adds_a_vehicle_after_fifteen_seconds():
     state = {}
     cloud_simulator.metrics(state, "/metrics/live-summary")

@@ -86,10 +86,10 @@ def dimensions():
 
 @app.get("/metrics/live-summary")
 def live_summary(hours: int = Query(default=1, ge=1, le=720), start_date: date | None = None,
-                 end_date: date | None = None):
-    """Line-health indicators for the selected recent window."""
+                 end_date: date | None = None, all_time: bool = False):
+    """Line-health indicators for a recent window or the complete history."""
     with connect() as conn, conn.cursor() as cur:
-        where, params = _history_filter("end_ts", hours, start_date, end_date)
+        where, params = _history_filter("end_ts", hours, start_date, end_date, all_time)
         cur.execute("""SELECT count(*) AS station_events,
             count(DISTINCT vehicle_id) AS vehicles,
             round(avg(cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
@@ -103,11 +103,12 @@ def live_summary(hours: int = Query(default=1, ge=1, le=720), start_date: date |
 
 @app.get("/metrics/trend")
 def trend(hours: int = Query(default=6, ge=1, le=720), start_date: date | None = None,
-          end_date: date | None = None):
-    """Five-minute throughput and cycle-time trend for recent operations."""
+          end_date: date | None = None, all_time: bool = False):
+    """Five-minute recent trend or daily trend across complete history."""
     with connect() as conn, conn.cursor() as cur:
-        where, params = _history_filter("end_ts", hours, start_date, end_date)
-        cur.execute("""SELECT date_bin('5 minutes', end_ts, date_trunc('hour', now())) AS time_bucket,
+        where, params = _history_filter("end_ts", hours, start_date, end_date, all_time)
+        bucket = "date_trunc('day', end_ts)" if all_time and not (start_date or end_date) else "date_bin('5 minutes', end_ts, date_trunc('hour', now()))"
+        cur.execute(f"""SELECT {bucket} AS time_bucket,
             count(*) AS station_events, count(DISTINCT vehicle_id) AS vehicles,
             round(avg(cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
             count(*) FILTER (WHERE status='rework') AS rework_events
@@ -117,10 +118,10 @@ def trend(hours: int = Query(default=6, ge=1, le=720), start_date: date | None =
 
 @app.get("/metrics/station-health")
 def station_health(hours: int = Query(default=1, ge=1, le=720), start_date: date | None = None,
-                   end_date: date | None = None):
+                   end_date: date | None = None, all_time: bool = False):
     """Show which stations are slow or producing the most rework."""
     with connect() as conn, conn.cursor() as cur:
-        where, params = _history_filter("f.end_ts", hours, start_date, end_date)
+        where, params = _history_filter("f.end_ts", hours, start_date, end_date, all_time)
         cur.execute("""SELECT f.station_id, count(*) AS events,
             round(avg(f.cycle_time_minutes)::numeric,2) AS avg_cycle_minutes,
             round(percentile_cont(0.9) WITHIN GROUP (ORDER BY f.cycle_time_minutes)::numeric,2) AS p90_cycle_minutes,
@@ -133,10 +134,10 @@ def station_health(hours: int = Query(default=1, ge=1, le=720), start_date: date
 
 @app.get("/metrics/quality")
 def quality(hours: int = Query(default=24, ge=1, le=720), start_date: date | None = None,
-            end_date: date | None = None):
+            end_date: date | None = None, all_time: bool = False):
     """Recent defect counts by type and severity for a Pareto-style view."""
     with connect() as conn, conn.cursor() as cur:
-        where, params = _history_filter("f.recorded_ts", hours, start_date, end_date)
+        where, params = _history_filter("f.recorded_ts", hours, start_date, end_date, all_time)
         cur.execute("""SELECT d.defect_type, f.severity, count(*) AS defects,
             count(*) FILTER (WHERE f.rework_flag) AS rework_defects
             FROM fact_defect f JOIN dim_defect d USING(defect_id)""" + where +
@@ -146,10 +147,10 @@ def quality(hours: int = Query(default=24, ge=1, le=720), start_date: date | Non
 
 @app.get("/metrics/downtime")
 def downtime(hours: int = Query(default=24, ge=1, le=720), start_date: date | None = None,
-             end_date: date | None = None):
+             end_date: date | None = None, all_time: bool = False):
     """Recent downtime minutes by station and stop reason."""
     with connect() as conn, conn.cursor() as cur:
-        where, params = _history_filter("end_ts", hours, start_date, end_date)
+        where, params = _history_filter("end_ts", hours, start_date, end_date, all_time)
         cur.execute("""SELECT station_id, reason_code, count(*) AS stops,
             round(sum(extract(epoch FROM (end_ts - start_ts)) / 60)::numeric,1) AS downtime_minutes
             FROM fact_downtime""" + where +
@@ -157,7 +158,8 @@ def downtime(hours: int = Query(default=24, ge=1, le=720), start_date: date | No
         return [dict(row) for row in cur.fetchall()]
 
 
-def _history_filter(column: str, hours: int, start_date: date | None, end_date: date | None):
+def _history_filter(column: str, hours: int, start_date: date | None, end_date: date | None,
+                    all_time: bool = False):
     """Return a safe SQL time predicate for a recent window or chosen dates."""
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be on or before end_date")
@@ -170,4 +172,6 @@ def _history_filter(column: str, hours: int, start_date: date | None, end_date: 
             clauses.append(f"{column} < (%s::date + INTERVAL '1 day')")
             params.append(end_date)
         return " WHERE " + " AND ".join(clauses), params
+    if all_time:
+        return "", []
     return f" WHERE {column} >= now() - (%s * INTERVAL '1 hour')", [hours]

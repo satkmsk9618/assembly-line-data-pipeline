@@ -15,6 +15,7 @@ I chose an assembly-line scenario because I’m interested in manufacturing data
 - Loads cleaned records into a PostgreSQL dimensional model and retains historical records across loads.
 - Exposes summary, trend, station, quality, and downtime metrics through FastAPI.
 - Displays throughput, cycle time against an 8-minute takt target, station performance, rework, defects, and downtime in Streamlit.
+- Lets users view recent windows, select **All time** for stored records, or choose a date range in Historical view.
 - Supports date-filtered history, optional Supabase email/password or Google sign-in, downloadable PDF reports, and opt-in daily report emails.
 
 ## Why I built it for manufacturing data engineering

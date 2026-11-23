@@ -150,7 +150,7 @@ def persist_new_records(state: MutableMapping) -> int:
     return len(events)
 
 
-def metrics(state: MutableMapping, path: str, hours: int = 1):
+def metrics(state: MutableMapping, path: str, hours: int = 1, all_time: bool = False):
     """Return cloud-demo metrics using the same shapes as the FastAPI routes."""
     if "cloud_events" not in state:
         _seed(state)
@@ -159,7 +159,7 @@ def metrics(state: MutableMapping, path: str, hours: int = 1):
     events = pd.DataFrame(state["cloud_events"])
     defects = pd.DataFrame(state["cloud_defects"])
     downtime = pd.DataFrame(state["cloud_downtime"])
-    recent = events[events["end_ts"] >= cutoff].copy()
+    recent = events.copy() if all_time else events[events["end_ts"] >= cutoff].copy()
 
     if path == "/metrics/live-summary":
         n = len(recent)
@@ -177,7 +177,8 @@ def metrics(state: MutableMapping, path: str, hours: int = 1):
     if path == "/metrics/trend":
         if recent.empty:
             return []
-        recent["time_bucket"] = pd.to_datetime(recent["end_ts"], utc=True).dt.floor("5min")
+        bucket_size = "D" if all_time else "5min"
+        recent["time_bucket"] = pd.to_datetime(recent["end_ts"], utc=True).dt.floor(bucket_size)
         result = recent.groupby("time_bucket").agg(
             station_events=("vehicle_id", "size"), vehicles=("vehicle_id", "nunique"),
             avg_cycle_minutes=("cycle_time_minutes", "mean"),
@@ -204,7 +205,7 @@ def metrics(state: MutableMapping, path: str, hours: int = 1):
     if path == "/metrics/quality":
         if defects.empty:
             return []
-        recent_defects = defects[defects["recorded_ts"] >= cutoff]
+        recent_defects = defects.copy() if all_time else defects[defects["recorded_ts"] >= cutoff]
         if recent_defects.empty:
             return []
         result = recent_defects.groupby(["defect_type", "severity"]).agg(
@@ -217,7 +218,7 @@ def metrics(state: MutableMapping, path: str, hours: int = 1):
     if path == "/metrics/downtime":
         if downtime.empty:
             return []
-        recent_downtime = downtime[downtime["end_ts"] >= cutoff].copy()
+        recent_downtime = downtime.copy() if all_time else downtime[downtime["end_ts"] >= cutoff].copy()
         if recent_downtime.empty:
             return []
         recent_downtime["downtime_minutes"] = (
