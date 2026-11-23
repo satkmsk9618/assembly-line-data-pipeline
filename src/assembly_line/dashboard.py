@@ -135,8 +135,16 @@ with st.sidebar:
             st.error("The start date must be on or before the end date.")
             st.stop()
         history_filters = {"start_date": history_start.isoformat(), "end_date": history_end.isoformat()}
+    auto_refresh = False
+    if data_view == "Recent":
+        auto_refresh = st.toggle("Auto-refresh every 15 seconds", value=True, key="dashboard_auto_refresh")
+        if not auto_refresh and st.button("Refresh dashboard now"):
+            st.rerun()
+    else:
+        st.caption("Historical results stay still while you review them.")
     st.markdown("---")
-    st.caption("Dashboard refreshes every 15 seconds.")
+    if data_view == "Recent":
+        st.caption("Auto-refresh is on." if auto_refresh else "Auto-refresh is paused.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
     if cloud_mode:
         st.caption("Hosted demo mode: the app generates its own sample events; PostgreSQL is not connected.")
@@ -169,7 +177,7 @@ def show_empty(message: str) -> None:
     st.info(message)
 
 
-@st.fragment(run_every=REFRESH_SECONDS)
+@st.fragment(run_every=REFRESH_SECONDS if auto_refresh and not history_filters else None)
 def show_live_dashboard(window_hours: int, history: dict):
     if cloud_mode and not history:
         cloud_simulator.advance(st.session_state)
@@ -203,7 +211,8 @@ def show_live_dashboard(window_hours: int, history: dict):
         age_seconds = max(0, int((pd.Timestamp.now(tz="UTC") - latest).total_seconds()))
         if age_seconds <= 180:
             source = "Hosted simulator" if cloud_mode else "Persistent simulated feed" if persistent_mode else "Simulated feed"
-            st.markdown(f'<div class="source-note">● {source} is active · latest event {age_seconds} seconds ago · dashboard refreshes every {REFRESH_SECONDS}s</div>', unsafe_allow_html=True)
+            refresh_note = f"auto-refreshes every {REFRESH_SECONDS}s" if auto_refresh else "auto-refresh is paused"
+            st.markdown(f'<div class="source-note">● {source} is active · latest event {age_seconds} seconds ago · {refresh_note}</div>', unsafe_allow_html=True)
         else:
             st.warning(f"The most recent event is {age_seconds // 60} minutes old. Check the simulator service in Docker Compose.")
 
