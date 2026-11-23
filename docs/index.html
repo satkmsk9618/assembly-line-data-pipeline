@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A student-built assembly line data pipeline using Python, Pandas, PostgreSQL, FastAPI, and Streamlit.">
+    <title>Assembly Line Data Pipeline | Sathish</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17212b;
+        --muted: #536171;
+        --paper: #f5f7f8;
+        --card: #ffffff;
+        --line: #dce3e8;
+        --accent: #086b62;
+        --accent-soft: #e2f2ef;
+        --navy: #163044;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      a { color: var(--accent); }
+      .wrap { width: min(100% - 36px, 1020px); margin: 0 auto; }
+      header { padding: 64px 0 52px; background: var(--navy); color: white; }
+      .eyebrow { color: #a9ddd3; font-size: .82rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { max-width: 780px; margin: 14px 0; font-size: clamp(2.2rem, 6vw, 4.2rem); line-height: 1.08; letter-spacing: -.04em; }
+      header p { max-width: 700px; margin: 0; color: #d8e3e8; font-size: 1.12rem; }
+      .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+      .button { display: inline-block; padding: 10px 16px; border: 1px solid #a9ddd3; border-radius: 8px; color: white; font-weight: 700; text-decoration: none; }
+      .button.primary { border-color: #bde8de; background: #bde8de; color: #102f32; }
+      main { padding: 34px 0 64px; }
+      section { margin: 20px 0; padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+      h2 { margin: 0 0 14px; font-size: 1.45rem; letter-spacing: -.02em; }
+      p { margin: 8px 0; }
+      .muted { color: var(--muted); }
+      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 22px; }
+      .stat { padding: 17px; border-radius: 10px; background: var(--accent-soft); }
+      .stat strong { display: block; color: #064c47; font-size: 1.5rem; line-height: 1.2; }
+      .stat span { color: #355c59; font-size: .9rem; }
+      .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 18px 0; }
+      .step { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafb; font-weight: 650; }
+      .arrow { color: var(--accent); font-weight: 800; }
+      .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      ul { margin: 10px 0 0; padding-left: 20px; }
+      li { margin: 6px 0; }
+      code { padding: 2px 5px; border-radius: 4px; background: #eef2f4; font-size: .9em; }
+      footer { padding: 24px 0 40px; color: var(--muted); font-size: .9rem; }
+      @media (max-width: 700px) {
+        header { padding: 46px 0 38px; }
+        section { padding: 20px; }
+        .stats { grid-template-columns: 1fr 1fr; }
+        .columns { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="eyebrow">Student data engineering project</div>
+        <h1>Assembly Line Data Pipeline</h1>
+        <p>I built a small end-to-end pipeline around simulated vehicle assembly data. It creates messy machine exports, cleans them with Python and Pandas, loads PostgreSQL, and shows the results in a dashboard.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/satkmsk9618/assembly-line-data-pipeline">View the GitHub repository</a>
+          <a class="button" href="https://github.com/satkmsk9618/assembly-line-data-pipeline/releases">See project releases</a>
+        </div>
+      </div>
+    </header>
+    <main class="wrap">
+      <section>
+        <h2>What I built</h2>
+        <p>The project simulates station events, quality defects, and downtime. The ETL step removes duplicate events and rejects records with missing timestamps or non-positive cycle times. A small FastAPI service reads the results from PostgreSQL, and Streamlit displays line metrics.</p>
+        <div class="stats" aria-label="Results from a local sample run">
+          <div class="stat"><strong>1,000</strong><span>simulated vehicles</span></div>
+          <div class="stat"><strong>5,024</strong><span>raw station rows</span></div>
+          <div class="stat"><strong>4,972</strong><span>clean events loaded</span></div>
+          <div class="stat"><strong>52</strong><span>invalid rows rejected</span></div>
+        </div>
+        <p class="muted">These are results from one local sample run. They are not a large-scale throughput or query-speed benchmark.</p>
+      </section>
+
+      <section>
+        <h2>How the data moves</h2>
+        <div class="flow" aria-label="Data flow">
+          <span class="step">Python data generator</span><span class="arrow">→</span>
+          <span class="step">Raw CSV files</span><span class="arrow">→</span>
+          <span class="step">Pandas cleaning</span><span class="arrow">→</span>
+          <span class="step">PostgreSQL</span><span class="arrow">→</span>
+          <span class="step">FastAPI</span><span class="arrow">→</span>
+          <span class="step">Streamlit dashboard</span>
+        </div>
+        <p class="muted">Docker Compose runs PostgreSQL, the API, and the dashboard together. I run the generate, clean, and load commands from the project’s Python environment.</p>
+      </section>
+
+      <div class="columns">
+        <section>
+          <h2>What I learned</h2>
+          <ul>
+            <li>Dirty data rules can overlap. One missing timestamp exposed a bug in my negative-cycle fault injection.</li>
+            <li>Later “file not found” errors can be consequences of an earlier failed pipeline step.</li>
+            <li>Docker’s host port can conflict with software already running on my computer, so I mapped PostgreSQL to port 5433.</li>
+            <li>Metric definitions and denominators need to be stated clearly; the OEE-style number is only a quality proxy.</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Tools and next steps</h2>
+          <p><strong>Tools:</strong> Python, Pandas, PostgreSQL, SQL, FastAPI, Streamlit, Docker Compose, pytest, and GitHub Actions.</p>
+          <p><strong>Next:</strong> measure representative SQL queries on a larger dataset, validate defect and downtime records, and improve incremental loading.</p>
+          <p><a href="https://github.com/satkmsk9618/assembly-line-data-pipeline/blob/main/README.md">Read the setup guide</a> · <a href="https://github.com/satkmsk9618/assembly-line-data-pipeline/blob/main/docs/version-1-troubleshooting.md">Read my first-run notes</a></p>
+        </section>
+      </div>
+    </main>
+    <footer class="wrap">Built and documented by Sathish as a learning project. All production records are simulated.</footer>
+  </body>
+</html>
