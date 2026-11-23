@@ -2,7 +2,7 @@
 
 I built this project to practice an end-to-end data engineering workflow using a simulated vehicle assembly line. It generates intentionally imperfect machine exports, cleans and analyzes them, stores events in PostgreSQL, and presents production and quality metrics in a Streamlit dashboard.
 
-I chose an assembly-line scenario because I’m interested in manufacturing data engineering, including the data quality and reporting needs behind a production dashboard. The event stream is synthetic; it is not connected to Tesla, factory equipment, or a public live production feed.
+I chose an assembly-line scenario because it brings together event processing, quality checks, operational metrics, and historical reporting in one project. All production events are synthetic; the dashboard is a demonstration and is not connected to factory equipment or a public live production feed.
 
 **Hosted dashboard:** [Open the Streamlit app](https://dashboardpy-ccqdte4aobbtrah4pw3u6z.streamlit.app/)
 
@@ -18,11 +18,11 @@ I chose an assembly-line scenario because I’m interested in manufacturing data
 - Lets users view recent windows, select **All time** for stored records, or choose a date range in Historical view.
 - Supports date-filtered history, optional Supabase email/password or Google sign-in, downloadable PDF reports, and opt-in daily report emails.
 
-## Why I built it for manufacturing data engineering
+## Skills and ideas I practiced
 
-This project gives me a practical way to work through several tasks that matter in a manufacturing data team: moving event data through an ETL process, checking and cleaning imperfect records, querying a relational model, and explaining operational metrics in a dashboard. It is a personal portfolio project using simulated data, not work performed for Tesla or a production factory.
+I built this project to get hands-on practice with the full path from imperfect machine-style exports to useful operational reporting. The simulated data lets me explore how ETL, SQL, data quality, dashboards, and documentation fit together without relying on access to a real production system.
 
-| Internship focus | What this project demonstrates |
+| Project area | What I implemented |
 |---|---|
 | ETL and data preparation | A repeatable Python/Pandas flow generates raw exports, cleans station events, calculates metrics, and loads PostgreSQL. |
 | SQL and relational data | PostgreSQL facts and dimensions, analytical query examples, date-filtered history, and a documented `EXPLAIN ANALYZE` exercise. |
@@ -31,7 +31,7 @@ This project gives me a practical way to work through several tasks that matter 
 | Backend and frontend | FastAPI serves dashboard metrics; Streamlit provides the interactive user interface. |
 | Version control and automated checks | GitHub hosts the code; pytest and GitHub Actions provide repeatable checks. I track tasks in a GitHub Project board, which is currently private. |
 
-The role also mentions monitoring and troubleshooting. This repository has pipeline audit counts, application logging, an API health endpoint, and automated tests, but it does **not** currently include a Splunk deployment, freshness or volume anomaly alerts, or a full production-grade validation-monitoring layer. Splunk, an evaluated prompt-driven query assistant, and Jira/Confluence workflows are possible next steps; the current planning and documentation live in GitHub Projects and `/docs`. A standalone repository also cannot demonstrate cross-functional teamwork or participation in another team's code reviews, so I describe those as skills to develop rather than claiming them here.
+I’m continuing to build out monitoring and troubleshooting. The project currently has pipeline audit counts, application logging, an API health endpoint, and automated tests. It does **not** yet include a Splunk deployment, freshness or volume anomaly alerts, or a full validation-monitoring layer. Those are possible next steps, along with a tested prompt-driven query assistant. Project planning and technical notes currently live in GitHub Projects and `/docs`.
 
 ## How the pieces fit together
 
