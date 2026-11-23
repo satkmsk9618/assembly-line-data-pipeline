@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 import os
+import secrets
 import threading
 import time
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, available_timezones
 
 import pandas as pd
@@ -12,7 +14,7 @@ import requests
 import streamlit as st
 
 from assembly_line import cloud_simulator
-from assembly_line.auth import auth_settings, current_user, make_client
+from assembly_line.auth import auth_settings, current_user, make_client, remember_oauth_client, take_oauth_client
 from assembly_line.db import connect, database_url
 from assembly_line.report_pdf import create_daily_pdf
 
@@ -33,13 +35,39 @@ auth_config = auth_settings()
 logged_in_user = None
 if auth_config:
     auth_client = make_client(*auth_config)
+    oauth_callback_error = ""
+    oauth_error = st.query_params.get("error_description") or st.query_params.get("error")
+    oauth_code = st.query_params.get("code")
+    if oauth_error:
+        oauth_callback_error = "Google sign-in was not completed. Please try again."
+        st.query_params.clear()
+    elif oauth_code:
+        oauth_flow = st.query_params.get("oauth_flow", "")
+        callback_client = take_oauth_client(oauth_flow)
+        if callback_client is None:
+            oauth_callback_error = "The Google sign-in session expired. Please start sign-in again."
+            st.query_params.clear()
+        else:
+            try:
+                result = callback_client.auth.exchange_code_for_session({"auth_code": oauth_code})
+                if result.session:
+                    st.session_state["auth_access_token"] = result.session.access_token
+                    st.session_state["auth_refresh_token"] = result.session.refresh_token
+                    st.query_params.clear()
+                    st.rerun()
+                oauth_callback_error = "Google sign-in did not return a session. Please try again."
+            except Exception:
+                oauth_callback_error = "Google sign-in could not be completed. Check the Supabase OAuth settings and try again."
+            st.query_params.clear()
     logged_in_user = current_user(auth_client, st.session_state.get("auth_access_token", ""),
                                   st.session_state.get("auth_refresh_token", ""))
     if not logged_in_user:
         st.title("Assembly Line Dashboard")
-        st.write("Sign in to view saved production history and manage your daily report.")
+        st.write("Sign in with email and password or Google to view saved production history and manage your daily report.")
         login_tab, signup_tab = st.tabs(["Sign in", "Create account"])
         with login_tab:
+            if oauth_callback_error:
+                st.error(oauth_callback_error)
             with st.form("sign_in_form"):
                 login_email = st.text_input("Email", key="login_email")
                 login_password = st.text_input("Password", type="password", key="login_password")
@@ -52,6 +80,17 @@ if auth_config:
                     st.rerun()
                 except Exception:
                     st.error("Sign-in failed. Check your email and password, then try again.")
+            try:
+                oauth_flow = secrets.token_urlsafe(24)
+                redirect_to = f"{st.context.url}?{urlencode({'oauth_flow': oauth_flow})}"
+                oauth_response = auth_client.auth.sign_in_with_oauth({
+                    "provider": "google",
+                    "options": {"redirect_to": redirect_to},
+                })
+                remember_oauth_client(oauth_flow, auth_client)
+                st.link_button("Continue with Google", oauth_response.url, use_container_width=True)
+            except Exception:
+                st.info("Google sign-in is unavailable. Check that Google is enabled in Supabase Auth.")
         with signup_tab:
             with st.form("sign_up_form"):
                 signup_email = st.text_input("Email", key="signup_email")

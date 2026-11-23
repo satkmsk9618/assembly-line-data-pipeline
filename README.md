@@ -15,7 +15,7 @@ I chose an assembly-line scenario because I’m interested in manufacturing data
 - Loads cleaned records into a PostgreSQL dimensional model and retains historical records across loads.
 - Exposes summary, trend, station, quality, and downtime metrics through FastAPI.
 - Displays throughput, cycle time against an 8-minute takt target, station performance, rework, defects, and downtime in Streamlit.
-- Supports date-filtered history, optional Supabase email/password sign-in, downloadable PDF reports, and opt-in daily report emails.
+- Supports date-filtered history, optional Supabase email/password or Google sign-in, downloadable PDF reports, and opt-in daily report emails.
 
 ## Why I built it for manufacturing data engineering
 
@@ -113,7 +113,7 @@ The loader appends records and skips event keys it has already loaded. To stop t
 
 The public demo can run in session-only preview mode without PostgreSQL. To enable persistent history, configure the app’s private Streamlit secrets with a PostgreSQL `DATABASE_URL` (Supabase PostgreSQL works). Leave `API_URL` unset for the hosted database mode. Run `sql/schema.sql` in the database before connecting it.
 
-Optional login uses `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Do not put the database password, Supabase service-role key, or SMTP password in this README or commit them to Git. Keep private values in Streamlit secrets or GitHub Actions secrets. Follow [the account, history, and daily report guide](docs/daily-report.md) for the full setup.
+Optional email/password and Google sign-in use `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Google OAuth also needs a Google OAuth client configured in Supabase Auth and matching redirect URLs; the setup guide includes the steps. Do not put the database password, Supabase service-role key, Google Client Secret, or SMTP password in this README or commit them to Git. Keep private values in the service settings described in [the account, history, and daily report guide](docs/daily-report.md).
 
 To deploy or update the dashboard, connect this repository to [Streamlit Community Cloud](https://share.streamlit.io/) and choose branch `main` and main file `src/assembly_line/dashboard.py`. New commits to `main` are then available for the app to deploy.
 
