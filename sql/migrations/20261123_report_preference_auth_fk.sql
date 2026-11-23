@@ -9,7 +9,7 @@ ALTER TABLE public.report_preference
 DO $$
 BEGIN
     IF to_regclass('auth.users') IS NULL THEN
-        RAISE EXCEPTION 'auth.users was not found; run this migration in the Supabase project database';
+        RAISE EXCEPTION 'auth.users was not found. Run this migration in the Supabase project database';
     END IF;
 
     IF EXISTS (
@@ -18,7 +18,7 @@ BEGIN
         LEFT JOIN auth.users AS auth_user ON auth_user.id = preference.user_id
         WHERE auth_user.id IS NULL
     ) THEN
-        RAISE EXCEPTION 'report_preference contains a user_id with no matching auth.users row; resolve orphan rows before applying this migration';
+        RAISE EXCEPTION 'report_preference contains a user_id with no matching auth.users row. Resolve orphan rows before applying this migration';
     END IF;
 
     IF NOT EXISTS (

@@ -19,7 +19,7 @@ All timestamps are ISO-8601 strings in raw exports and UTC-aware `TIMESTAMPTZ` v
 | | `start_ts`, `end_ts` | Interruption interval |
 | | `reason_code` | `jam`, `maintenance`, `material_wait`, or `changeover` |
 
-The generator introduces duplicate station rows, missing timestamps, negative cycle times, and shuffled arrival order. The transformation currently rejects missing or non-positive cycles and removes exact station event duplicates. It preserves defect and downtime rows as delivered; extending their validation is a planned improvement.
+The generator introduces duplicate station rows, missing timestamps, negative cycle times, and shuffled arrival order. The transformation currently rejects missing or non-positive cycles and removes exact station event duplicates. It preserves defect and downtime rows as delivered. Extending their validation is a planned improvement.
 
 ## PostgreSQL model
 
@@ -32,7 +32,7 @@ The generator introduces duplicate station rows, missing timestamps, negative cy
 | `fact_defect` | One defect record | vehicle, station/defect keys, severity, rework flag, recorded timestamp |
 | `fact_downtime` | One downtime interval | station, timestamps, reason code |
 
-The event fact is partitioned by `start_ts`; the 2026 partition covers the generated sample and the default partition accepts other years. Its primary key includes the partition key, as PostgreSQL requires for partitioned unique constraints.
+The event fact is partitioned by `start_ts`. The 2026 partition covers the generated sample and the default partition accepts other years. Its primary key includes the partition key, as PostgreSQL requires for partitioned unique constraints.
 
 ### Relationships
 
@@ -43,4 +43,4 @@ The event fact is partitioned by `start_ts`; the 2026 partition covers the gener
 - `fact_downtime.station_id` → `dim_station.station_id`
 - `report_preference.user_id` → Supabase `auth.users.id` (on hosted Supabase only)
 
-`vehicle_id` is a degenerate identifier stored on the facts; there is no separate vehicle dimension in this demo. Defect and downtime records are separate fact tables and join to station/defect dimensions, rather than directly to a station-event row. The event partition children inherit the parent fact's keys and constraints. The report-preference foreign key is added by `sql/migrations/20261123_report_preference_auth_fk.sql`; run that migration in the Supabase SQL Editor to see the Auth relationship in the schema diagram. A public-schema-only diagram may still omit the referenced `auth.users` table because it belongs to Supabase's `auth` schema.
+`vehicle_id` is a degenerate identifier stored on the facts. There is no separate vehicle dimension in this demo. Defect and downtime records are separate fact tables and join to station/defect dimensions, rather than directly to a station-event row. The event partition children inherit the parent fact's keys and constraints. The report-preference foreign key is added by `sql/migrations/20261123_report_preference_auth_fk.sql`. Run that migration in the Supabase SQL Editor to see the Auth relationship in the schema diagram. A public-schema-only diagram may still omit the referenced `auth.users` table because it belongs to Supabase's `auth` schema.

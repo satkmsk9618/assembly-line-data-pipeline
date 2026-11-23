@@ -220,7 +220,7 @@ with st.sidebar:
             st.caption("New simulated records are still saved every 15 seconds. Use Refresh dashboard now to load the latest view.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
     if cloud_mode:
-        st.caption("Hosted demo mode: the app generates its own sample events; PostgreSQL is not connected.")
+        st.caption("Hosted demo mode: the app generates its own sample events. PostgreSQL is not connected.")
         if data_view == "Historical":
             st.warning("This session has no persistent history. Configure API_URL to a PostgreSQL-backed API to browse saved dates.")
             st.stop()
@@ -333,7 +333,7 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
                 if show_all_time:
                     # All-time history is grouped to one row per calendar day.
                     # A line chart can look empty when the database has only
-                    # one day; bars keep that first daily total visible and
+                    # one day. Bars keep that first daily total visible and
                     # make the current day's growing total easy to notice.
                     st.bar_chart(trend_frame[["vehicles"]], y_label="Vehicles per day", height=280)
                 else:
@@ -347,7 +347,7 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
 
         station_frame = pd.DataFrame(stations)
         st.subheader("Which station needs attention?")
-        st.caption("Stations are ranked by average cycle time. The target line is 8-minute takt; check the rework and over-takt columns before deciding what to investigate.")
+        st.caption("Stations are ranked by average cycle time. The target line is 8-minute takt. Check the rework and over-takt columns before deciding what to investigate.")
         if station_frame.empty:
             show_empty("No station events in this time window yet.")
         else:

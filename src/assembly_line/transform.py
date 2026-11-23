@@ -75,7 +75,7 @@ def calculate_metrics(events: pd.DataFrame, defects: pd.DataFrame, downtime: pd.
 
 
 def extract_csv(directory: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Read machine exports. Station events are required; other files are optional."""
+    """Read machine exports. Station events are required, and other files are optional."""
     event_file = directory / "station_events.csv"
     if not event_file.exists():
         raise FileNotFoundError(f"Expected raw station file: {event_file}")

@@ -4,7 +4,7 @@ Live board: [Assembly Line Data Pipeline](https://github.com/users/satkmsk9618/p
 
 | Ticket | Acceptance check |
 |---|---|
-| Generate simulated exports | Seed and vehicle count are configurable; three raw files are produced |
+| Generate simulated exports | Seed and vehicle count are configurable, and three raw files are produced |
 | Clean station events | Duplicate, missing, and non-positive rows are counted and excluded |
 | Calculate line metrics | Cycle time, takt deviation, FPY, and bottleneck candidate are reported |
 | Create dimensional schema | Dimensions and event, defect, downtime facts initialize with Docker |
@@ -17,4 +17,4 @@ Live board: [Assembly Line Data Pipeline](https://github.com/users/satkmsk9618/p
 | Email daily line report | Scheduled workflow creates a recent 24-hour synthetic report and emails it over configured SMTP |
 | Document the project | Data dictionary, flow, setup, dashboard, and trade-offs are explained |
 
-For each pull request, describe the project change, how it was checked, and one trade-off. Ask a peer to review when possible; if self-reviewing, label it as self-review.
+For each pull request, describe the project change, how it was checked, and one trade-off. Ask a peer to review when possible. If self-reviewing, label it as self-review.

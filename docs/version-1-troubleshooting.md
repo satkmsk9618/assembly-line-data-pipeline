@@ -24,7 +24,7 @@ After that, PostgreSQL could not bind to port `5432` because my Mac already had 
 
 ## Running commands from the right folder
 
-Some setup commands were also tried from `Downloads`. That folder does not contain this project's `.env.example`, `docker-compose.yml`, or `pyproject.toml`, so the copy, Compose, and Python install commands could not work there. I now clone the repository and change into its folder before setup. The project URL by itself is not a shell command; `git clone` needs to come before it. If the destination folder already exists, I open that folder and update it instead of trying to clone over it.
+Some setup commands were also tried from `Downloads`. That folder does not contain this project's `.env.example`, `docker-compose.yml`, or `pyproject.toml`, so the copy, Compose, and Python install commands could not work there. I now clone the repository and change into its folder before setup. The project URL by itself is not a shell command. `git clone` needs to come before it. If the destination folder already exists, I open that folder and update it instead of trying to clone over it.
 
 ## The working run I checked
 
@@ -50,4 +50,4 @@ These numbers describe one generated sample. I have not benchmarked SQL speedup 
 
 ## Altair `TypedDict` crash on the hosted dashboard
 
-The hosted app once failed when Streamlit tried to draw its first line chart. The traceback ended in Altair 5.5 with `TypeError: _TypedDictMeta.__new__() got an unexpected keyword argument 'closed'` on the Cloud Python 3.14 runtime. I pinned the app to Streamlit 1.67 and Altair 6.3, which supports that runtime, and added an import/version check to GitHub Actions. After the dependency update deploys, reload the app; no data reset is needed.
+The hosted app once failed when Streamlit tried to draw its first line chart. The traceback ended in Altair 5.5 with `TypeError: _TypedDictMeta.__new__() got an unexpected keyword argument 'closed'` on the Cloud Python 3.14 runtime. I pinned the app to Streamlit 1.67 and Altair 6.3, which supports that runtime, and added an import/version check to GitHub Actions. After the dependency update deploys, reload the app. No data reset is needed.

@@ -26,7 +26,7 @@ def auth_settings() -> tuple[str, str] | None:
 
 
 def make_client(url: str, anon_key: str) -> Client:
-    # Each Streamlit browser session owns its own client; do not cache a client
+    # Each Streamlit browser session owns its own client. Do not cache a client
     # whose mutable Auth session could otherwise be shared between viewers.
     return create_client(url, anon_key)
 

@@ -15,7 +15,7 @@ DEFECTS = ["paint_scratch", "loose_fastener", "sensor_fault", "misalignment"]
 
 def generate(output_dir: Path, vehicles: int = 1000, seed: int = 7,
              start_at: datetime | None = None) -> None:
-    """Write raw CSV exports; optionally anchor the synthetic run in time."""
+    """Write raw CSV exports, with an optional synthetic start time."""
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
     base = start_at or datetime(2026, 1, 5, 6, tzinfo=timezone.utc)

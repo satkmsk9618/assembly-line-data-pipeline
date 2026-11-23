@@ -1,5 +1,5 @@
 -- Run with: psql "$DATABASE_URL" -f sql/analytics.sql
--- These are practice queries; capture plans using EXPLAIN (ANALYZE, BUFFERS).
+-- These are practice queries. Capture plans using EXPLAIN (ANALYZE, BUFFERS).
 
 -- 1. Average cycle time by station (bottleneck candidates)
 SELECT station_id, round(avg(cycle_time_minutes), 2) AS avg_cycle

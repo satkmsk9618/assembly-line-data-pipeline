@@ -103,7 +103,7 @@ def render_html(report: dict) -> str:
 <tr><td>Downtime events</td><td><strong>{summary['downtime_events']:,}</strong></td><td>Bottleneck candidate</td><td><strong>{summary['bottleneck_station']}</strong></td></tr>
 </tbody></table>
 <h2>Station detail</h2><table style="border-collapse:collapse;width:100%"><thead><tr><th>Station</th><th>Events</th><th>Avg cycle</th><th>Takt deviation</th><th>Rework</th></tr></thead><tbody>{station_rows}</tbody></table>
-<p style="color:#587079;font-size:13px;margin-top:24px">All production records are synthetic; no factory equipment is connected. The dashboard and this email are separate runs of the same project metrics.</p>
+<p style="color:#587079;font-size:13px;margin-top:24px">All production records are synthetic, and no factory equipment is connected. The dashboard and this email are separate runs of the same project metrics.</p>
 </body></html>"""
 
 

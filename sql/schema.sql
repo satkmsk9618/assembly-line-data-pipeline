@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS fact_station_event (
     status TEXT NOT NULL,
     PRIMARY KEY (event_id, start_ts)
 ) PARTITION BY RANGE (start_ts);
--- One yearly partition is enough for the demo; the default catches other dates.
+-- One yearly partition is enough for the demo. The default catches other dates.
 CREATE TABLE IF NOT EXISTS fact_station_event_2026 PARTITION OF fact_station_event
     FOR VALUES FROM ('2026-01-01 00:00:00+00') TO ('2027-01-01 00:00:00+00');
 CREATE TABLE IF NOT EXISTS fact_station_event_default PARTITION OF fact_station_event DEFAULT;
