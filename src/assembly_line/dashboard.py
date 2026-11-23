@@ -8,6 +8,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from assembly_line import cloud_simulator
+
 st.set_page_config(page_title="Assembly Line Control Room", page_icon="🚗", layout="wide")
 st.markdown("""
 <style>
@@ -23,7 +25,8 @@ st.markdown("""
 
 st.title("🚗 Assembly Line Control Room")
 st.caption("A live operations view backed by a clearly labeled simulated event stream.")
-api_url = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+api_url = os.getenv("API_URL", "").rstrip("/")
+cloud_mode = not api_url
 REFRESH_SECONDS = 15
 
 with st.sidebar:
@@ -32,9 +35,13 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Dashboard refreshes every 15 seconds.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
+    if cloud_mode:
+        st.caption("Hosted demo mode: the app generates its own sample events; PostgreSQL is not connected.")
 
 
 def get_json(path: str, **params):
+    if cloud_mode:
+        return cloud_simulator.metrics(st.session_state, path, int(params.get("hours", 1)))
     response = requests.get(f"{api_url}{path}", params=params, timeout=8)
     response.raise_for_status()
     return response.json()
@@ -46,6 +53,8 @@ def show_empty(message: str) -> None:
 
 @st.fragment(run_every=REFRESH_SECONDS)
 def show_live_dashboard(window_hours: int):
+    if cloud_mode:
+        cloud_simulator.advance(st.session_state)
     try:
         summary = get_json("/metrics/live-summary", hours=window_hours)
         trend = get_json("/metrics/trend", hours=window_hours)
@@ -63,7 +72,8 @@ def show_live_dashboard(window_hours: int):
     else:
         age_seconds = max(0, int((pd.Timestamp.now(tz="UTC") - latest).total_seconds()))
         if age_seconds <= 180:
-            st.markdown(f'<div class="source-note">● Simulated feed is active · latest event {age_seconds} seconds ago · dashboard refreshes every {REFRESH_SECONDS}s</div>', unsafe_allow_html=True)
+            source = "Hosted simulator" if cloud_mode else "Simulated feed"
+            st.markdown(f'<div class="source-note">● {source} is active · latest event {age_seconds} seconds ago · dashboard refreshes every {REFRESH_SECONDS}s</div>', unsafe_allow_html=True)
         else:
             st.warning(f"The most recent event is {age_seconds // 60} minutes old. Check the simulator service in Docker Compose.")
 

@@ -10,6 +10,12 @@ I built an end-to-end pipeline that turns messy simulated assembly-line exports 
 4. Loads the cleaned data into PostgreSQL tables arranged as a small star schema.
 5. Serves read-only metrics through FastAPI and displays them in Streamlit.
 
+## Hosted dashboard
+
+The Streamlit Community Cloud entrypoint is `src/assembly_line/dashboard.py`. Without an `API_URL`, it runs a self-contained demo simulator in the viewer's Streamlit session and refreshes its charts every 15 seconds. This hosted mode needs no local Docker setup, database, API credentials, or secrets. Its sample records are synthetic and session-local; they are not shared with the PostgreSQL database used by the Docker deployment.
+
+To deploy it, connect the public GitHub repository to [Streamlit Community Cloud](https://share.streamlit.io/), select branch `main` and file `src/assembly_line/dashboard.py`, then deploy. Streamlit Cloud reads the pinned dashboard dependencies from `requirements.txt`. The local Docker Compose setup remains available below when you want to inspect the ETL files, PostgreSQL schema, and FastAPI service.
+
 ## Run it locally
 
 I tested this project on macOS with Docker Desktop and Python 3.13. Python 3.11 or newer and Docker Compose are required. Start Docker Desktop first, then open Terminal and run the commands from the repository folder. If you have not cloned the project yet:
@@ -102,7 +108,7 @@ Start Postgres, load the generated sample, and run selected queries from `sql/an
 
 ## Tests and CI
 
-The repository includes pytest checks for core cleaning and metric behavior. Run `pytest` locally. GitHub Actions runs the same test suite on pushes and pull requests.
+The repository includes pytest checks for core cleaning, metric behavior, and the hosted simulator. Run `pytest` locally. GitHub Actions runs the same test suite on pushes and pull requests.
 
 ## Pull request practice and project board
 
