@@ -1,12 +1,30 @@
 # Assembly Line Data Pipeline
 
-I built this project to practice an end-to-end data engineering workflow using a simulated vehicle assembly line. It generates intentionally imperfect machine exports, cleans and analyzes them, stores events in PostgreSQL, and presents production and quality metrics in a Streamlit dashboard.
+[![CI](https://github.com/satkmsk9618/assembly-line-data-pipeline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/satkmsk9618/assembly-line-data-pipeline/actions/workflows/ci.yml)
+
+I built this project to practice an end-to-end data engineering workflow for a simulated vehicle assembly line. It creates imperfect machine-style exports, cleans and analyzes station events, stores history in PostgreSQL, and displays production and quality metrics in Streamlit.
 
 I chose an assembly-line scenario because it brings together event processing, quality checks, operational metrics, and historical reporting in one project. All production events are synthetic; the dashboard is a demonstration and is not connected to factory equipment or a public live production feed.
 
 **Hosted dashboard:** [Open the Streamlit app](https://dashboardpy-ccqdte4aobbtrah4pw3u6z.streamlit.app/)
 
 **Repository:** [satkmsk9618/assembly-line-data-pipeline](https://github.com/satkmsk9618/assembly-line-data-pipeline)
+
+## Quick start
+
+Requirements: Git and Docker Desktop with Docker Compose.
+
+```bash
+git clone https://github.com/satkmsk9618/assembly-line-data-pipeline.git && cd assembly-line-data-pipeline
+cp .env.example .env
+docker compose up --build -d
+```
+
+Open the dashboard at <http://localhost:8501>. The FastAPI docs are at <http://localhost:8000/docs>. The simulator writes synthetic events to PostgreSQL every 15 seconds. To run the batch CSV pipeline too, follow [Run the batch ETL](#run-the-batch-etl).
+
+## Results from a reproducible sample run
+
+With `--vehicles 1000 --seed 7`, the batch ETL read **5,024 raw station rows**, kept **4,972 cleaned rows**, and excluded **52 rows** from the clean output, including **23 exact duplicates**. The sample covered **1,000 vehicles** across five stations, with a **6.99-minute average cycle time** against an 8-minute takt target and **86.1% first-pass yield**. These are results from this seeded synthetic batch, not live factory performance.
 
 ## What it does
 
@@ -29,7 +47,7 @@ I built this project to get hands-on practice with the full path from imperfect 
 | Data quality | The generator includes duplicates, missing timestamps, shuffled rows, and invalid cycle times. The transform removes duplicates, rejects invalid station events, and reports row counts. |
 | Dashboards and documentation | Streamlit views surface takt misses, cycle time, rework, defects, and downtime. The repository documents the data model, dashboard, setup, and data flow. |
 | Backend and frontend | FastAPI serves dashboard metrics; Streamlit provides the interactive user interface. |
-| Version control and automated checks | GitHub hosts the code; pytest and GitHub Actions provide repeatable checks. I track tasks in a GitHub Project board, which is currently private. |
+| Version control and automated checks | GitHub hosts the code; pytest and GitHub Actions provide repeatable checks. |
 
 I’m continuing to build out monitoring and troubleshooting. The project currently has pipeline audit counts, application logging, an API health endpoint, and automated tests. It does **not** yet include a Splunk deployment, freshness or volume anomaly alerts, or a full validation-monitoring layer. Those are possible next steps, along with a tested prompt-driven query assistant. Project planning and technical notes currently live in GitHub Projects and `/docs`.
 
@@ -91,16 +109,7 @@ PostgreSQL is the history store. The dashboard’s Historical view queries that 
 
 ### Start the dashboard stack
 
-Run these commands from a terminal. Keep the terminal in the cloned repository directory:
-
-```bash
-git clone https://github.com/satkmsk9618/assembly-line-data-pipeline.git
-cd assembly-line-data-pipeline
-cp .env.example .env
-docker compose up --build -d
-```
-
-Wait for the services to start, then open:
+The [Quick start](#quick-start) commands launch the services. Wait for them to become healthy, then open:
 
 - Dashboard: <http://localhost:8501>
 - FastAPI interactive docs: <http://localhost:8000/docs>
