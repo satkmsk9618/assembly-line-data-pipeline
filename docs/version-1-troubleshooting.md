@@ -47,3 +47,7 @@ These numbers describe one generated sample. I have not benchmarked SQL speedup 
 - If the generator says a raw file is missing, run `assembly-line generate` first and check that the terminal is in the repository folder.
 - If the loader cannot connect, confirm the database container is healthy with `docker compose ps` and that `.env` uses the same host port as Compose.
 - To stop the demo services, run `docker compose down`. Add `-v` only when you also want to remove the demo database volume.
+
+## Altair `TypedDict` crash on the hosted dashboard
+
+The hosted app once failed when Streamlit tried to draw its first line chart. The traceback ended in Altair 5.5 with `TypeError: _TypedDictMeta.__new__() got an unexpected keyword argument 'closed'` on the Cloud Python 3.14 runtime. I pinned the app to Streamlit 1.67 and Altair 6.3, which supports that runtime, and added an import/version check to GitHub Actions. After the dependency update deploys, reload the app; no data reset is needed.
