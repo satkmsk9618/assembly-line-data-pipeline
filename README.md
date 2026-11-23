@@ -2,7 +2,7 @@
 
 I built this project to practice an end-to-end data engineering workflow using a simulated vehicle assembly line. It generates intentionally imperfect machine exports, cleans and analyzes them, stores events in PostgreSQL, and presents production and quality metrics in a Streamlit dashboard.
 
-The event stream is synthetic. It is not connected to factory equipment or a public live production feed.
+I chose an assembly-line scenario because I’m interested in manufacturing data engineering, including the data quality and reporting needs behind a production dashboard. The event stream is synthetic; it is not connected to Tesla, factory equipment, or a public live production feed.
 
 **Hosted dashboard:** [Open the Streamlit app](https://dashboardpy-ccqdte4aobbtrah4pw3u6z.streamlit.app/)
 
@@ -16,6 +16,21 @@ The event stream is synthetic. It is not connected to factory equipment or a pub
 - Exposes summary, trend, station, quality, and downtime metrics through FastAPI.
 - Displays throughput, cycle time against an 8-minute takt target, station performance, rework, defects, and downtime in Streamlit.
 - Supports date-filtered history, optional Supabase email/password sign-in, downloadable PDF reports, and opt-in daily report emails.
+
+## Why I built it for manufacturing data engineering
+
+This project gives me a practical way to work through several tasks that matter in a manufacturing data team: moving event data through an ETL process, checking and cleaning imperfect records, querying a relational model, and explaining operational metrics in a dashboard. It is a personal portfolio project using simulated data, not work performed for Tesla or a production factory.
+
+| Internship focus | What this project demonstrates |
+|---|---|
+| ETL and data preparation | A repeatable Python/Pandas flow generates raw exports, cleans station events, calculates metrics, and loads PostgreSQL. |
+| SQL and relational data | PostgreSQL facts and dimensions, analytical query examples, date-filtered history, and a documented `EXPLAIN ANALYZE` exercise. |
+| Data quality | The generator includes duplicates, missing timestamps, shuffled rows, and invalid cycle times. The transform removes duplicates, rejects invalid station events, and reports row counts. |
+| Dashboards and documentation | Streamlit views surface takt misses, cycle time, rework, defects, and downtime. The repository documents the data model, dashboard, setup, and data flow. |
+| Backend and frontend | FastAPI serves dashboard metrics; Streamlit provides the interactive user interface. |
+| Version control and automated checks | GitHub hosts the code; pytest and GitHub Actions provide repeatable checks. I track tasks in a GitHub Project board, which is currently private. |
+
+The role also mentions monitoring and troubleshooting. This repository has pipeline audit counts, application logging, an API health endpoint, and automated tests, but it does **not** currently include a Splunk deployment, freshness or volume anomaly alerts, or a full production-grade validation-monitoring layer. Splunk, an evaluated prompt-driven query assistant, and Jira/Confluence workflows are possible next steps; the current planning and documentation live in GitHub Projects and `/docs`. A standalone repository also cannot demonstrate cross-functional teamwork or participation in another team's code reviews, so I describe those as skills to develop rather than claiming them here.
 
 ## How the pieces fit together
 
