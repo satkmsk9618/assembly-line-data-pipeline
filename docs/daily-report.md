@@ -4,17 +4,13 @@ The project can email a summary every day using the scheduled GitHub Actions wor
 
 ## Configure delivery
 
-Add these GitHub Actions repository secrets under **Settings → Secrets and variables → Actions → New repository secret**:
+For Gmail, I configured the SMTP host as `smtp.gmail.com`, the username and sender as the Gmail address, and port `587` with STARTTLS. The recipient and non-password SMTP settings are stored in the repository's Actions secrets/variables. Add the remaining sender credential under **Settings → Secrets and variables → Actions → New repository secret**:
 
 | Secret | Purpose |
 |---|---|
-| `REPORT_EMAIL_TO` | Destination email address |
-| `REPORT_EMAIL_FROM` | Sender address accepted by your SMTP provider |
-| `REPORT_SMTP_HOST` | SMTP server hostname |
-| `REPORT_SMTP_USERNAME` | SMTP login name |
 | `REPORT_SMTP_PASSWORD` | SMTP password or provider app password |
 
-The default SMTP port is `587` with STARTTLS. If your provider uses a different port or implicit TLS, add repository variables `REPORT_SMTP_PORT` and, when needed, `REPORT_SMTP_SECURITY=ssl`. The security mode accepts `starttls` or `ssl`. Keep the provider password in GitHub Secrets; never add it to this repository or a Streamlit secrets file.
+For a Gmail account, use a Google app password for SMTP authentication rather than your regular account password. If you switch providers or use implicit TLS, update the GitHub settings `REPORT_SMTP_HOST`, `REPORT_SMTP_USERNAME`, `REPORT_EMAIL_FROM`, `REPORT_SMTP_PORT`, and, when needed, `REPORT_SMTP_SECURITY=ssl`. The security mode accepts `starttls` or `ssl`. Keep the provider password in GitHub Secrets; never add it to this repository or a Streamlit secrets file.
 
 The schedule runs once each day at **09:00 UTC**. GitHub Actions can delay scheduled runs during heavy load. The workflow can also be started manually from the repository's **Actions** tab after all secrets have been configured.
 
