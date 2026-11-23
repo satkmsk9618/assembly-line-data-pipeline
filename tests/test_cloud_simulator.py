@@ -41,6 +41,19 @@ def test_cloud_demo_adds_a_vehicle_after_fifteen_seconds():
     assert len(state["cloud_events"]) == state["cloud_vehicle_number"] * len(cloud_simulator.STATIONS)
 
 
+def test_cloud_demo_all_time_daily_chart_includes_new_vehicle():
+    state = {}
+    before = cloud_simulator.metrics(state, "/metrics/trend", all_time=True)
+    now = state["cloud_last_batch"] + timedelta(seconds=15)
+
+    assert cloud_simulator.advance(state, now=now)
+    after = cloud_simulator.metrics(state, "/metrics/trend", all_time=True)
+
+    assert sum(row["station_events"] for row in after) == (
+        sum(row["station_events"] for row in before) + len(cloud_simulator.STATIONS)
+    )
+
+
 def test_cloud_demo_does_not_add_a_vehicle_early():
     state = {}
     cloud_simulator.metrics(state, "/metrics/live-summary")

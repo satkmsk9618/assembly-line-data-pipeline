@@ -318,10 +318,20 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
             trend_frame = trend_frame.set_index("time_bucket").sort_index()
             with left:
                 st.subheader("Production pace")
-                st.line_chart(trend_frame[["vehicles"]], y_label="Vehicles per day" if show_all_time else "Vehicles per 5 minutes", height=280)
+                if show_all_time:
+                    # All-time history is grouped to one row per calendar day.
+                    # A line chart can look empty when the database has only
+                    # one day; bars keep that first daily total visible and
+                    # make the current day's growing total easy to notice.
+                    st.bar_chart(trend_frame[["vehicles"]], y_label="Vehicles per day", height=280)
+                else:
+                    st.line_chart(trend_frame[["vehicles"]], y_label="Vehicles per 5 minutes", height=280)
             with right:
                 st.subheader("Cycle time over the shift")
-                st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Average cycle per day (minutes)" if show_all_time else "Minutes", height=280)
+                if show_all_time:
+                    st.bar_chart(trend_frame[["avg_cycle_minutes"]], y_label="Average cycle per day (minutes)", height=280)
+                else:
+                    st.line_chart(trend_frame[["avg_cycle_minutes"]], y_label="Minutes", height=280)
 
         station_frame = pd.DataFrame(stations)
         st.subheader("Which station needs attention?")

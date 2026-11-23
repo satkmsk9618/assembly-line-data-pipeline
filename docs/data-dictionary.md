@@ -33,3 +33,14 @@ The generator introduces duplicate station rows, missing timestamps, negative cy
 | `fact_downtime` | One downtime interval | station, timestamps, reason code |
 
 The event fact is partitioned by `start_ts`; the 2026 partition covers the generated sample and the default partition accepts other years. Its primary key includes the partition key, as PostgreSQL requires for partitioned unique constraints.
+
+### Relationships
+
+- `fact_station_event.station_id` → `dim_station.station_id`
+- `fact_station_event.shift_id` → `dim_shift.shift_id`
+- `fact_defect.station_id` → `dim_station.station_id`
+- `fact_defect.defect_id` → `dim_defect.defect_id`
+- `fact_downtime.station_id` → `dim_station.station_id`
+- `report_preference.user_id` → Supabase `auth.users.id` (on hosted Supabase only)
+
+`vehicle_id` is a degenerate identifier stored on the facts; there is no separate vehicle dimension in this demo. Defect and downtime records are separate fact tables and join to station/defect dimensions, rather than directly to a station-event row. The event partition children inherit the parent fact's keys and constraints. The report-preference foreign key is added by `sql/migrations/20261123_report_preference_auth_fk.sql`; run that migration in the Supabase SQL Editor to see the Auth relationship in the schema diagram. A public-schema-only diagram may still omit the referenced `auth.users` table because it belongs to Supabase's `auth` schema.
