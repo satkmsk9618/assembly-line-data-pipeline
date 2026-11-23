@@ -73,32 +73,31 @@ I’m continuing to build out monitoring and troubleshooting. The project curren
 ```mermaid
 flowchart LR
     subgraph Batch[Batch ETL]
-        A[Python data generator] --> B[Raw CSV files]
-        B --> C[Pandas ETL: clean station events and calculate metrics]
+        A[Python data generator] --> B[Raw station, defect, and downtime CSVs]
+        B --> C[Pandas ETL: validate station events and calculate metrics]
         C --> D[Processed CSV files and metrics JSON]
-        D --> E[Database loader]
+        D --> E[Database loader: append and deduplicate]
     end
-    subgraph Live[Separate simulated feed]
-        F[15-second event simulator]
+    E --> DB[(PostgreSQL history)]
+    subgraph Local[Local Docker Compose mode]
+        LocalSim[15-second simulator service] --> DB
+        DB --> API[FastAPI metrics endpoints]
+        API --> LocalUI[Streamlit dashboard]
     end
-    E --> G[(PostgreSQL history)]
-    F --> G
-    subgraph Local[Local Docker Compose]
-        G --> H[FastAPI metrics endpoints]
-        H --> I[Streamlit dashboard]
+    subgraph Hosted[Hosted database mode: DATABASE_URL configured]
+        DB --> Metrics[In-app metric functions]
+        Metrics --> HostedUI[Streamlit dashboard]
+        Simulator[Background simulator thread] --> DB
+        Auth[Optional Supabase Auth] --> HostedUI
     end
-    subgraph Hosted[Hosted app with DATABASE_URL]
-        G --> J[In-app metric functions]
-        J --> K[Streamlit dashboard]
-        L[Hosted simulator thread] --> G
+    subgraph Preview[Hosted preview mode: DATABASE_URL not configured]
+        SessionSim[Session-local simulator] --> PreviewUI[Streamlit dashboard preview]
     end
-    M[Session preview simulator] --> K
-    N[Supabase Auth, optional] --> K
-    G --> O[Daily report workflow]
-    O --> P[PDF email]
+    DB --> Report[Scheduled daily report workflow]
+    Report --> Email[Opt-in PDF email]
 ```
 
-The diagram shows two data-ingestion paths. The batch ETL generates raw CSV files, cleans station-event records with Pandas, writes processed files and a metrics report, then loads the records into PostgreSQL. Defect and downtime CSVs are currently extracted and loaded, but receive less cleaning than station events. Separately, the 15-second simulator creates new events and writes them directly to PostgreSQL; it does not pass through the batch CSV-cleaning steps. In Docker Compose, that simulator is a separate service. In the hosted database mode, it runs as a background thread while the app is active.
+The diagram shows the implemented batch path and the dashboard run modes. The batch ETL generates raw CSV files, validates station events with Pandas, writes processed files and a metrics report, then loads records into PostgreSQL. Defect and downtime CSVs are extracted and loaded with less cleaning than station events. In the local Docker Compose mode, the simulator is a separate service that writes to PostgreSQL every 15 seconds. In the hosted database mode, a background thread writes to PostgreSQL while the app is active. These modes are alternatives: the hosted preview simulator runs only when `DATABASE_URL` is not configured and its session data is not stored in PostgreSQL.
 
 The dashboard connection depends on where it runs. Locally, Streamlit requests metrics from FastAPI. In the hosted app with `DATABASE_URL` configured and `API_URL` unset, Streamlit calls the same metric functions in-process, and those functions query PostgreSQL directly. Without a database connection, the hosted preview uses session-local simulated data and has no persistent history. Recent-window auto-refresh starts paused; **All time** turns it on automatically so new stored batches appear every 15 seconds.
 

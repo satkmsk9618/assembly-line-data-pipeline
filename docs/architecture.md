@@ -3,30 +3,28 @@
 ```mermaid
 flowchart LR
   subgraph Batch[Batch ETL]
-    A[Python generator] -->|raw CSV exports| B[data/raw]
-    B --> C[Pandas ETL: clean station events and calculate metrics]
+    A[Python generator] -->|raw station, defect, and downtime CSVs| B[data/raw]
+    B --> C[Pandas ETL: validate station events and calculate metrics]
     C -->|processed CSVs and metrics JSON| D[data/processed]
-    D --> L[Database loader]
+    D --> L[Database loader: append and deduplicate]
   end
-  subgraph Feed[Separate simulated feed]
-    H[15-second simulator]
-  end
-  L -->|append and deduplicate| E[(PostgreSQL history)]
-  H --> E
-  subgraph Local[Local Docker Compose]
+  L --> E[(PostgreSQL history)]
+  subgraph Local[Local Docker Compose mode]
+    LocalSim[15-second simulator service] --> E
     E --> F[FastAPI metrics endpoints]
     F --> G[Streamlit dashboard]
   end
-  subgraph Hosted[Hosted app with DATABASE_URL]
-    E --> M[In-process metric functions]
+  subgraph Hosted[Hosted database mode: DATABASE_URL configured]
+    E --> M[In-app metric functions]
     M --> N[Streamlit dashboard]
     O[Background simulator thread] --> E
+    Q[Optional Supabase Auth] --> N
   end
-  P[Session-local preview simulator] --> N
-  Q[Optional Supabase Auth] --> G
-  Q --> N
-  E --> J[Daily report workflow]
-  J -->|PDF email| K[Account email]
+  subgraph Preview[Hosted preview mode: DATABASE_URL not configured]
+    P[Session-local simulator] --> R[Streamlit dashboard preview]
+  end
+  E --> J[Scheduled daily report workflow]
+  J -->|opt-in PDF email| K[Email recipient]
 ```
 
 ## Why these components?
@@ -37,7 +35,7 @@ flowchart LR
 - **FastAPI:** gives the local Compose dashboard a small metrics API. In hosted database mode, Streamlit calls the same metric functions in-process instead of making a network request to FastAPI.
 - **Streamlit:** provides a quick visual layer without needing a separate JavaScript frontend.
 
-The batch ETL and the live simulator are separate ingestion paths. The batch path generates CSV exports, cleans station events, writes processed files, and loads the database. The simulator writes new synthetic events directly to PostgreSQL every 15 seconds; it does not use the batch cleaning step. Docker Compose runs the simulator as its own service. In hosted database mode, the app starts a background simulator thread that saves to PostgreSQL while the app is active. Without a database connection, the hosted preview uses session-local simulated events that are not persistent. The dashboard can select stored history or filter past dates when PostgreSQL is configured. Recent-window auto-refresh is paused by default, and the All time view refreshes automatically every 15 seconds.
+The batch ETL and live simulator are separate implemented ingestion paths. The batch path generates CSV exports, validates station events, writes processed files, and loads PostgreSQL. Defect and downtime files are loaded with less validation. The Docker Compose simulator service and hosted background simulator thread write synthetic records directly to PostgreSQL every 15 seconds. The hosted preview simulator is a separate no-database mode; its session-local events are not persistent. Local Docker Compose and hosted database mode are alternative run configurations. The dashboard can select stored history or filter past dates when PostgreSQL is configured. Recent-window auto-refresh is paused by default, and the All time view refreshes automatically every 15 seconds.
 
 Daily email is opt-in per signed-in account. An hourly GitHub Actions run checks each saved time zone and send hour, summarizes the prior local calendar day from PostgreSQL, and attaches a PDF. The generated report does not invent a data sample when the database has no records.
 
