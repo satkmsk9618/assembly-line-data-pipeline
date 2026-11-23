@@ -12,24 +12,54 @@ A portfolio project for learning how raw factory exports become trusted analytic
 
 ## Run it locally
 
-You need Docker Compose and Python 3.11 or newer. In the project folder:
+I tested this project on macOS with Docker Desktop and Python 3.13. Python 3.11 or newer and Docker Compose are required. Start Docker Desktop first, then open Terminal and run the commands from the repository folder. If you have not cloned the project yet:
+
+```bash
+git clone https://github.com/satkmsk9618/assembly-line-data-pipeline.git
+cd assembly-line-data-pipeline
+```
+
+Then set up the database and Python environment:
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
-python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\\Scripts\\activate
-pip install -e '.[dashboard,dev]'
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dashboard,dev]'
+```
+
+Generate the sample data, clean it, and load it into the database:
+
+```bash
 assembly-line generate --vehicles 1000 --seed 7
 assembly-line run
 assembly-line load
 ```
 
-Open the dashboard at <http://localhost:8501> and the interactive API docs at <http://localhost:8000/docs>. The database initializes from `sql/schema.sql` on its first start. `docker compose down -v` removes the demo database and its data.
+On Windows PowerShell, create the environment with `py -m venv .venv` and activate it with `.\.venv\Scripts\Activate.ps1`, then run the same pip and `assembly-line` commands. Keep the terminal in the repository folder for every step; the project files such as `.env.example`, `docker-compose.yml`, and `pyproject.toml` are there.
+
+Open the dashboard at <http://localhost:8501> and the interactive API docs at <http://localhost:8000/docs>. The database initializes from `sql/schema.sql` on its first start. `docker compose down` stops the services. `docker compose down -v` also deletes the demo database and its data.
 
 The files in `data/raw/` are ignored by Git because they are generated. To keep a source checkout light, regenerate them with the command above. You can use `--vehicles` to change the sample size and `--seed` to make a repeatable alternative sample.
 
 Compose publishes PostgreSQL on `localhost:5433` so it can run alongside a local PostgreSQL installation that already uses port 5432. If you change `POSTGRES_HOST_PORT` in `.env`, update the port in `DATABASE_URL` to match.
+
+## What went wrong in my first run
+
+I hit a few setup problems while trying the first version. Writing them down helped me separate the actual code bug from the commands that were run in the wrong place.
+
+| What I saw | Why it happened | What changed |
+|---|---|---|
+| `ValueError: Invalid isoformat string: ''` during `generate` | My test-data generator intentionally blanked a timestamp and also tried to use that same row to make a negative cycle. It tried to parse the blank value as a date. | The negative-cycle fault is now added only when the start timestamp exists. A one-vehicle regression test covers this overlap. |
+| `Expected raw station file: data/raw/station_events.csv` and then a missing processed CSV | These were follow-on errors: generation had stopped before writing the raw files, so cleaning and loading had nothing to read. | After generation succeeds, run the three pipeline commands in order: `generate`, `run`, then `load`. |
+| Docker could not connect to `docker.sock` | Docker Desktop was not running yet, so Compose could not reach the Docker service. | Start Docker Desktop, wait until it says it is running, then run `docker compose up --build -d`. |
+| Port `5432` was already in use | PostgreSQL was already running locally on my Mac on that port. | Compose now publishes its database on port `5433`. The sample `.env` points the local loader to the same port. |
+| `.env.example`, Compose, or Python project files were “not found” | I ran setup commands from `Downloads` instead of from the cloned repository. | Clone the repo, `cd assembly-line-data-pipeline`, and run the setup commands there. |
+
+After applying the fixes, I ran the pipeline with the documented seed and 1,000 vehicles. It generated 5,024 raw station rows, kept 4,972 clean rows, rejected 52 invalid rows, and removed 23 duplicates. The 4,972 clean station events loaded into PostgreSQL. I also checked the API summary and station endpoints; the dashboard and API services were running in Compose. These are results from my local sample run, not a claim about millions of records or a measured query speedup.
+
+For more help, see [the troubleshooting notes](docs/version-1-troubleshooting.md).
 
 ## Follow one row through the pipeline
 

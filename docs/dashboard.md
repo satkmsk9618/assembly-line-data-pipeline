@@ -4,4 +4,4 @@ Open <http://localhost:8501> after the services are running and after loading da
 
 The dashboard calls `/dimensions`, `/metrics/summary`, and `/metrics/stations` on the FastAPI service. If there are no database rows yet, load a dataset. If the API is unavailable, confirm the Compose services are healthy and check <http://localhost:8000/health>.
 
-The chart flags candidates, not root causes. A useful next improvement is a date and shift filter so comparisons use the same production mix.
+The chart flags candidates, not root causes. A useful next improvement is to compare stations across matching date ranges and shift mixes, so the chart is less affected by changes in the production mix.

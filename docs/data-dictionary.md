@@ -19,7 +19,7 @@ All timestamps are ISO-8601 strings in raw exports and UTC-aware `TIMESTAMPTZ` v
 | | `start_ts`, `end_ts` | Interruption interval |
 | | `reason_code` | `jam`, `maintenance`, `material_wait`, or `changeover` |
 
-The generator introduces duplicate station rows, missing timestamps, equal start/end times, and shuffled arrival order. The transformation currently rejects missing or non-positive cycles and removes exact station event duplicates. It preserves defect and downtime rows as delivered; extending their validation is a planned improvement.
+The generator introduces duplicate station rows, missing timestamps, negative cycle times, and shuffled arrival order. The transformation currently rejects missing or non-positive cycles and removes exact station event duplicates. It preserves defect and downtime rows as delivered; extending their validation is a planned improvement.
 
 ## PostgreSQL model
 
