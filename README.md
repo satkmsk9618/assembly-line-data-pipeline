@@ -14,9 +14,18 @@ I chose an assembly-line scenario because it brings together event processing, q
 
 Screenshots from the hosted dashboard. All displayed production data is simulated.
 
+![Line overview showing production pace, cycle time, and line metrics](docs/screenshots/line-overview.png)
+
+<details>
+<summary>View station performance, quality, and downtime</summary>
+
+![Station performance showing average and 90th-percentile cycle time against takt](docs/screenshots/station-performance.png)
+
 ![Quality dashboard showing defect totals by type and severity](docs/screenshots/quality-dashboard.png)
 
 ![Downtime dashboard showing minutes lost by stop reason and station](docs/screenshots/downtime-dashboard.png)
+
+</details>
 
 ## Quick start
 
