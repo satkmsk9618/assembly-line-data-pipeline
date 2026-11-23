@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Query
 
 from assembly_line.db import connect
 
-app = FastAPI(title="Assembly Line Metrics API", version="0.3.0")
+app = FastAPI(title="Assembly Line Metrics API", version="0.4.0")
 
 
 @app.get("/health")

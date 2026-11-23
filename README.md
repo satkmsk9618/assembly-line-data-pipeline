@@ -9,10 +9,13 @@ I built an end-to-end pipeline that turns messy simulated assembly-line exports 
 3. Calculates cycle time, takt deviation, first-pass yield, and station bottleneck candidates.
 4. Loads the cleaned data into PostgreSQL tables arranged as a small star schema.
 5. Serves read-only metrics through FastAPI and displays them in Streamlit.
+6. Can email a daily summary of a fresh, simulated 24-hour sample through GitHub Actions.
 
 ## Hosted dashboard
 
 The Streamlit Community Cloud entrypoint is `src/assembly_line/dashboard.py`. Without an `API_URL`, it runs a self-contained demo simulator in the viewer's Streamlit session and refreshes its charts every 15 seconds. This hosted mode needs no local Docker setup, database, API credentials, or secrets. Its sample records are synthetic and session-local; they are not shared with the PostgreSQL database used by the Docker deployment.
+
+The [daily email report](docs/daily-report.md) runs separately from the Streamlit viewer. It generates a new synthetic sample once a day and emails the same project metrics; configure SMTP credentials as GitHub repository secrets.
 
 To deploy it, connect the public GitHub repository to [Streamlit Community Cloud](https://share.streamlit.io/), select branch `main` and file `src/assembly_line/dashboard.py`, then deploy. Streamlit Cloud reads the pinned dashboard dependencies from `requirements.txt`. The local Docker Compose setup remains available below when you want to inspect the ETL files, PostgreSQL schema, and FastAPI service.
 

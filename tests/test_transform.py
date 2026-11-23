@@ -27,6 +27,18 @@ def test_metrics_identify_station_with_longest_average_cycle():
     assert result["summary"]["first_pass_yield_pct"] == 0.0
 
 
+def test_metrics_do_not_count_a_vehicle_with_a_missing_station_as_first_pass():
+    events = pd.DataFrame([
+        {"vehicle_id": "COMPLETE", "station_id": "S1", "cycle_time_minutes": 5.0, "status": "complete"},
+        {"vehicle_id": "COMPLETE", "station_id": "S2", "cycle_time_minutes": 5.0, "status": "complete"},
+        {"vehicle_id": "INCOMPLETE", "station_id": "S1", "cycle_time_minutes": 5.0, "status": "complete"},
+    ])
+
+    result = calculate_metrics(events, pd.DataFrame(), pd.DataFrame())
+
+    assert result["summary"]["first_pass_yield_pct"] == 50.0
+
+
 def test_generator_can_create_dirty_data_with_one_vehicle(tmp_path):
     generate(tmp_path, vehicles=1, seed=7)
     raw = pd.read_csv(tmp_path / "station_events.csv")

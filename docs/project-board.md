@@ -14,6 +14,7 @@ Live board: [Assembly Line Data Pipeline](https://github.com/users/satkmsk9618/p
 | Write analytical SQL | Ten examples include CTEs, aggregation, and windows |
 | Measure a query | Before/after plans and timings are recorded with the dataset context |
 | Add tests and CI | Pytest runs locally and in GitHub Actions |
+| Email daily line report | Scheduled workflow creates a recent 24-hour synthetic report and emails it over configured SMTP |
 | Document the project | Data dictionary, flow, setup, dashboard, and trade-offs are explained |
 
-For each pull request, describe the learner-facing change, how it was checked, and one trade-off. Ask a peer to review when possible; if self-reviewing, label it as self-review.
+For each pull request, describe the project change, how it was checked, and one trade-off. Ask a peer to review when possible; if self-reviewing, label it as self-review.

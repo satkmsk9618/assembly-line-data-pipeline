@@ -1,6 +1,7 @@
 """Command line entry point for the assembly-line pipeline."""
 import argparse
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from assembly_line.generate import generate
@@ -14,6 +15,8 @@ def main() -> None:
     gen.add_argument("--vehicles", type=int, default=1000)
     gen.add_argument("--seed", type=int, default=7)
     gen.add_argument("--output", type=Path, default=Path("data/raw"))
+    gen.add_argument("--start-at", type=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
+                     help="optional ISO-8601 timestamp for a recent synthetic sample")
     run = sub.add_parser("run", help="clean exports and calculate metrics")
     run.add_argument("--raw", type=Path, default=Path("data/raw"))
     run.add_argument("--processed", type=Path, default=Path("data/processed"))
@@ -23,7 +26,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.command == "generate":
-        generate(args.output, args.vehicles, args.seed)
+        generate(args.output, args.vehicles, args.seed, args.start_at)
     else:
         if args.command == "run":
             run_pipeline(args.raw, args.processed, args.takt)

@@ -13,11 +13,15 @@ SHIFTS = ["day", "swing", "night"]
 DEFECTS = ["paint_scratch", "loose_fastener", "sensor_fault", "misalignment"]
 
 
-def generate(output_dir: Path, vehicles: int = 1000, seed: int = 7) -> None:
-    """Write three raw CSV exports; a fixed seed makes reruns comparable."""
+def generate(output_dir: Path, vehicles: int = 1000, seed: int = 7,
+             start_at: datetime | None = None) -> None:
+    """Write raw CSV exports; optionally anchor the synthetic run in time."""
     rng = random.Random(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
-    base = datetime(2026, 1, 5, 6, tzinfo=timezone.utc)
+    base = start_at or datetime(2026, 1, 5, 6, tzinfo=timezone.utc)
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=timezone.utc)
+    base = base.astimezone(timezone.utc)
     events, defects, downtime = [], [], []
     for number in range(1, vehicles + 1):
         vehicle_id = f"V-{number:06d}"
@@ -64,8 +68,10 @@ def main() -> None:
     parser.add_argument("--vehicles", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--output", type=Path, default=Path("data/raw"))
+    parser.add_argument("--start-at", type=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
+                        help="optional ISO-8601 UTC start time for a recent synthetic sample")
     args = parser.parse_args()
-    generate(args.output, args.vehicles, args.seed)
+    generate(args.output, args.vehicles, args.seed, args.start_at)
     print(f"Generated exports for {args.vehicles} vehicles in {args.output}")
 
 

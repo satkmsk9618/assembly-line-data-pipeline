@@ -51,7 +51,12 @@ def calculate_metrics(events: pd.DataFrame, defects: pd.DataFrame, downtime: pd.
     station = station.sort_values("avg_cycle_minutes", ascending=False)
     # Yield is vehicle-level: one rework station means the vehicle did not pass
     # every operation on its first attempt.
-    vehicle_pass = events.groupby("vehicle_id")["status"].apply(lambda values: bool((values == "complete").all()))
+    expected_stations = events["station_id"].nunique()
+    vehicle_summary = events.groupby("vehicle_id").agg(
+        all_complete=("status", lambda values: bool((values == "complete").all())),
+        stations_seen=("station_id", "nunique"),
+    )
+    vehicle_pass = vehicle_summary["all_complete"] & (vehicle_summary["stations_seen"] == expected_stations)
     total_vehicles = len(vehicle_pass)
     first_pass = int(vehicle_pass.sum())
     summary = {
