@@ -37,20 +37,35 @@ I’m continuing to build out monitoring and troubleshooting. The project curren
 
 ```mermaid
 flowchart LR
-    A[Python data generator] --> B[Raw CSV exports]
-    B --> C[Pandas extraction and cleaning]
-    C --> D[Processed CSV and metrics JSON]
-    D --> E[(PostgreSQL star schema)]
-    F[15-second simulator] --> E
-    E --> G[FastAPI metrics endpoints]
-    G --> H[Streamlit dashboard]
-    H --> I[Historical filters and PDF export]
-    J[Supabase Auth, optional] --> H
-    E --> K[Opt-in daily report job]
-    K --> L[PDF email]
+    subgraph Batch[Batch ETL]
+        A[Python data generator] --> B[Raw CSV files]
+        B --> C[Pandas ETL: clean station events and calculate metrics]
+        C --> D[Processed CSV files and metrics JSON]
+        D --> E[Database loader]
+    end
+    subgraph Live[Separate simulated feed]
+        F[15-second event simulator]
+    end
+    E --> G[(PostgreSQL history)]
+    F --> G
+    subgraph Local[Local Docker Compose]
+        G --> H[FastAPI metrics endpoints]
+        H --> I[Streamlit dashboard]
+    end
+    subgraph Hosted[Hosted app with DATABASE_URL]
+        G --> J[In-app metric functions]
+        J --> K[Streamlit dashboard]
+        L[Hosted simulator thread] --> G
+    end
+    M[Session preview simulator] --> K
+    N[Supabase Auth, optional] --> K
+    G --> O[Daily report workflow]
+    O --> P[PDF email]
 ```
 
-The batch ETL path makes it possible to inspect raw and cleaned files. The simulator provides a continuing sample stream for the dashboard. In the local Compose setup, a separate simulator service writes to PostgreSQL every 15 seconds. In the hosted app, when `DATABASE_URL` is configured, a background simulator saves new records to PostgreSQL every 15 seconds while the app is active. Recent-window dashboard auto-refresh starts paused; the **All time** view turns it on automatically so newly saved batches appear every 15 seconds. The sidebar switch can pause refreshing, and **Refresh dashboard now** loads the latest database values on demand.
+The diagram shows two data-ingestion paths. The batch ETL generates raw CSV files, cleans station-event records with Pandas, writes processed files and a metrics report, then loads the records into PostgreSQL. Defect and downtime CSVs are currently extracted and loaded, but receive less cleaning than station events. Separately, the 15-second simulator creates new events and writes them directly to PostgreSQL; it does not pass through the batch CSV-cleaning steps. In Docker Compose, that simulator is a separate service. In the hosted database mode, it runs as a background thread while the app is active.
+
+The dashboard connection depends on where it runs. Locally, Streamlit requests metrics from FastAPI. In the hosted app with `DATABASE_URL` configured and `API_URL` unset, Streamlit calls the same metric functions in-process, and those functions query PostgreSQL directly. Without a database connection, the hosted preview uses session-local simulated data and has no persistent history. Recent-window auto-refresh starts paused; **All time** turns it on automatically so new stored batches appear every 15 seconds.
 
 PostgreSQL is the history store. The dashboard’s Historical view queries that stored data for a selected date range. History begins accumulating after a database connection is configured; session-only preview events are not backfilled into PostgreSQL.
 

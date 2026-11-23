@@ -2,31 +2,42 @@
 
 ```mermaid
 flowchart LR
-  A[Python generator] -->|raw CSV exports| B[data/raw]
-  B --> C[Extract and clean with Pandas]
-  C -->|clean CSV and metrics JSON| D[data/processed]
-  D -->|append and deduplicate| E[(PostgreSQL history)]
-  H[Simulated event stream] --> E
-  E --> F[FastAPI read-only metrics endpoints]
-  F --> G[Streamlit dashboard]
-  G -->|no database configured| H2[Session-local preview simulator]
-  H2 --> G
-  I[Supabase Auth] -->|verified account| G
-  G -->|private DATABASE_URL| E
-  E -->|historical date filters| G
-  E --> J[Opt-in scheduler]
-  J -->|daily PDF| K[Account email]
+  subgraph Batch[Batch ETL]
+    A[Python generator] -->|raw CSV exports| B[data/raw]
+    B --> C[Pandas ETL: clean station events and calculate metrics]
+    C -->|processed CSVs and metrics JSON| D[data/processed]
+    D --> L[Database loader]
+  end
+  subgraph Feed[Separate simulated feed]
+    H[15-second simulator]
+  end
+  L -->|append and deduplicate| E[(PostgreSQL history)]
+  H --> E
+  subgraph Local[Local Docker Compose]
+    E --> F[FastAPI metrics endpoints]
+    F --> G[Streamlit dashboard]
+  end
+  subgraph Hosted[Hosted app with DATABASE_URL]
+    E --> M[In-process metric functions]
+    M --> N[Streamlit dashboard]
+    O[Background simulator thread] --> E
+  end
+  P[Session-local preview simulator] --> N
+  Q[Optional Supabase Auth] --> G
+  Q --> N
+  E --> J[Daily report workflow]
+  J -->|PDF email| K[Account email]
 ```
 
 ## Why these components?
 
 - **Generator:** creates repeatable fake machine exports without external data access.
-- **Pandas transform:** exposes the cleaning rules in a familiar table-oriented style.
+- **Pandas transform:** exposes the cleaning rules in a familiar table-oriented style. Station events get duplicate, timestamp, and cycle-time checks; defect and downtime CSVs currently receive less validation.
 - **PostgreSQL:** stores facts separately from descriptive dimensions and runs analytical SQL.
-- **FastAPI:** keeps database access out of the dashboard and gives the UI a small API contract.
+- **FastAPI:** gives the local Compose dashboard a small metrics API. In hosted database mode, Streamlit calls the same metric functions in-process instead of making a network request to FastAPI.
 - **Streamlit:** provides a quick visual layer without needing a separate JavaScript frontend.
 
-The batch ETL is still available so I can inspect raw and processed CSV files. Docker Compose starts a simulator that appends vehicle events to PostgreSQL every 15 seconds. Recent-window dashboard auto-refresh is paused by default; the All time view refreshes automatically every 15 seconds, and users can pause it or refresh manually. The hosted Streamlit preview keeps session-local events if no database is configured. When a private PostgreSQL URL is configured in Streamlit secrets, one shared simulator state is written to PostgreSQL and the dashboard can select all stored history or filter past dates. Supabase Auth provides optional email/password and Google sign-in, while the server-side database connection remains private.
+The batch ETL and the live simulator are separate ingestion paths. The batch path generates CSV exports, cleans station events, writes processed files, and loads the database. The simulator writes new synthetic events directly to PostgreSQL every 15 seconds; it does not use the batch cleaning step. Docker Compose runs the simulator as its own service. In hosted database mode, the app starts a background simulator thread that saves to PostgreSQL while the app is active. Without a database connection, the hosted preview uses session-local simulated events that are not persistent. The dashboard can select stored history or filter past dates when PostgreSQL is configured. Recent-window auto-refresh is paused by default, and the All time view refreshes automatically every 15 seconds.
 
 Daily email is opt-in per signed-in account. An hourly GitHub Actions run checks each saved time zone and send hour, summarizes the prior local calendar day from PostgreSQL, and attaches a PDF. The generated report does not invent a data sample when the database has no records.
 
