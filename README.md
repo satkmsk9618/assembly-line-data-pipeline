@@ -10,6 +10,14 @@ I chose an assembly-line scenario because it brings together event processing, q
 
 **Repository:** [satkmsk9618/assembly-line-data-pipeline](https://github.com/satkmsk9618/assembly-line-data-pipeline)
 
+## Dashboard preview
+
+Screenshots from the hosted dashboard. All displayed production data is simulated.
+
+![Quality dashboard showing defect totals by type and severity](docs/screenshots/quality-dashboard.png)
+
+![Downtime dashboard showing minutes lost by stop reason and station](docs/screenshots/downtime-dashboard.png)
+
 ## Quick start
 
 Requirements: Git and Docker Desktop with Docker Compose.
