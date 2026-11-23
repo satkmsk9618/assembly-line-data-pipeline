@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="A student-built assembly line data pipeline using Python, Pandas, PostgreSQL, FastAPI, and Streamlit.">
+    <meta name="description" content="I built an assembly line data pipeline and live dashboard using Python, Pandas, PostgreSQL, FastAPI, and Streamlit.">
     <title>Assembly Line Data Pipeline | Sathish</title>
     <style>
       :root {
@@ -61,9 +61,9 @@
   <body>
     <header>
       <div class="wrap">
-        <div class="eyebrow">Student data engineering project</div>
+        <div class="eyebrow">Data engineering project</div>
         <h1>Assembly Line Data Pipeline</h1>
-        <p>I built a small end-to-end pipeline around simulated vehicle assembly data. It creates messy machine exports, cleans them with Python and Pandas, loads PostgreSQL, and shows the results in a live-updating dashboard.</p>
+        <p>I built an end-to-end pipeline for simulated vehicle assembly data. It creates messy machine exports, cleans them with Python and Pandas, loads PostgreSQL, and shows the results in a live-updating dashboard.</p>
         <div class="actions">
           <a class="button primary" href="https://github.com/satkmsk9618/assembly-line-data-pipeline">View the GitHub repository</a>
           <a class="button" href="https://github.com/satkmsk9618/assembly-line-data-pipeline/releases">See project releases</a>
@@ -102,8 +102,8 @@
           <ul>
             <li>Dirty data rules can overlap. One missing timestamp exposed a bug in my negative-cycle fault injection.</li>
             <li>Later “file not found” errors can be consequences of an earlier failed pipeline step.</li>
-          <li>Docker’s host port can conflict with software already running on my computer, so I mapped PostgreSQL to port 5433.</li>
-          <li>A small simulator keeps the charts updating, while making it clear that no real factory feed is connected.</li>
+            <li>Docker’s host port can conflict with software already running on my computer, so I mapped PostgreSQL to port 5433.</li>
+            <li>A Python simulator generates five new station events every 15 seconds, while making it clear that no real factory feed is connected.</li>
             <li>Metric definitions and denominators need to be stated clearly; the OEE-style number is only a quality proxy.</li>
           </ul>
         </section>
@@ -115,6 +115,6 @@
         </section>
       </div>
     </main>
-    <footer class="wrap">Built and documented by Sathish as a learning project. All production records are simulated.</footer>
+    <footer class="wrap">I built and documented this project. All production records are simulated.</footer>
   </body>
 </html>

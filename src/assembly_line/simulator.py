@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -13,6 +12,7 @@ from assembly_line.generate import DEFECTS, SHIFTS, STATIONS
 
 LOGGER = logging.getLogger("assembly_line.simulator")
 REASONS = ["jam", "maintenance", "material_wait", "changeover"]
+STREAM_INTERVAL_SECONDS = 15
 
 
 def produce_batch(rng: random.Random) -> dict[str, int | str]:
@@ -85,10 +85,9 @@ def produce_batch(rng: random.Random) -> dict[str, int | str]:
 
 
 def main() -> None:
-    interval = max(2.0, float(os.getenv("LIVE_INTERVAL_SECONDS", "10")))
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     rng = random.Random()
-    LOGGER.info(json.dumps({"event": "simulator_started", "interval_seconds": interval,
+    LOGGER.info(json.dumps({"event": "simulator_started", "interval_seconds": STREAM_INTERVAL_SECONDS,
                             "source": "simulated"}))
     schema_ready = False
     while True:
@@ -114,7 +113,7 @@ def main() -> None:
         except Exception as exc:  # Keep the demo stream alive if the DB restarts.
             schema_ready = False
             LOGGER.error(json.dumps({"event": "simulator_error", "message": str(exc)}))
-        time.sleep(interval)
+        time.sleep(STREAM_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

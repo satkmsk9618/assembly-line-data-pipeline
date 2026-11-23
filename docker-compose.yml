@@ -36,7 +36,6 @@ services:
     command: ["python", "-m", "assembly_line.simulator"]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-assembly_app}:${POSTGRES_PASSWORD:-change-me-locally}@db:5432/${POSTGRES_DB:-assembly_line}
-      LIVE_INTERVAL_SECONDS: ${LIVE_INTERVAL_SECONDS:-10}
     depends_on:
       db:
         condition: service_healthy

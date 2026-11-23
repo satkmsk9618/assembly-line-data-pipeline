@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assembly-line-pipeline"
-version = "0.2.0"
-description = "A student-friendly simulated assembly-line analytics project"
+version = "0.2.1"
+description = "An assembly-line data pipeline and live dashboard built with simulated production events"
 requires-python = ">=3.11"
 dependencies = ["pandas>=2.2,<3", "psycopg[binary]>=3.2,<4", "fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "python-dotenv>=1.0,<2"]
 

@@ -11,9 +11,12 @@ import streamlit as st
 st.set_page_config(page_title="Assembly Line Control Room", page_icon="🚗", layout="wide")
 st.markdown("""
 <style>
+  *, *::before, *::after {box-sizing: border-box;}
   .block-container {padding-top: 1.8rem; padding-bottom: 3rem;}
-  [data-testid="stMetric"] {background: #f4f7f8; border: 1px solid #e1e8eb; padding: 14px 16px; border-radius: 12px;}
-  [data-testid="stMetricLabel"] {color: #425466;}
+  [data-testid="stMetric"] {background: #f4f7f8; border: 1px solid #e1e8eb; padding: 14px 16px; border-radius: 12px; width: 100%; height: 142px; display: flex; flex-direction: column; justify-content: space-between;}
+  [data-testid="stMetricLabel"] {color: #425466; min-height: 24px;}
+  [data-testid="stMetricValue"] {min-height: 44px; display: flex; align-items: center;}
+  [data-testid="stMetricDelta"] {min-height: 20px;}
   .source-note {padding: 12px 15px; border-radius: 10px; background: #e8f4f1; color: #145a50;}
 </style>
 """, unsafe_allow_html=True)
@@ -21,12 +24,13 @@ st.markdown("""
 st.title("🚗 Assembly Line Control Room")
 st.caption("A live operations view backed by a clearly labeled simulated event stream.")
 api_url = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+REFRESH_SECONDS = 15
 
 with st.sidebar:
     st.header("Dashboard settings")
     hours = st.selectbox("Recent data window", [1, 6, 24], index=0, format_func=lambda n: f"Last {n} hour" if n == 1 else f"Last {n} hours")
-    refresh_seconds = st.selectbox("Auto-refresh", [5, 15, 30], index=1, format_func=lambda n: f"Every {n} seconds")
     st.markdown("---")
+    st.caption("Dashboard refreshes every 15 seconds.")
     st.caption("All records are synthetic. No real factory equipment is connected.")
 
 
@@ -40,7 +44,7 @@ def show_empty(message: str) -> None:
     st.info(message)
 
 
-@st.fragment(run_every=refresh_seconds)
+@st.fragment(run_every=REFRESH_SECONDS)
 def show_live_dashboard(window_hours: int):
     try:
         summary = get_json("/metrics/live-summary", hours=window_hours)
@@ -59,7 +63,7 @@ def show_live_dashboard(window_hours: int):
     else:
         age_seconds = max(0, int((pd.Timestamp.now(tz="UTC") - latest).total_seconds()))
         if age_seconds <= 180:
-            st.markdown(f'<div class="source-note">● Simulated feed is active · latest event {age_seconds} seconds ago · refreshing every {refresh_seconds}s</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="source-note">● Simulated feed is active · latest event {age_seconds} seconds ago · dashboard refreshes every {REFRESH_SECONDS}s</div>', unsafe_allow_html=True)
         else:
             st.warning(f"The most recent event is {age_seconds // 60} minutes old. Check the simulator service in Docker Compose.")
 
@@ -70,12 +74,12 @@ def show_live_dashboard(window_hours: int):
     rework_pct = float(summary.get("rework_rate_pct") or 0)
     rate = round(vehicles / window_hours, 1)
 
-    metric_cols = st.columns(5)
-    metric_cols[0].metric(f"Vehicles · {window_hours}h", f"{vehicles:,}", f"{rate}/hour")
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Vehicles", f"{vehicles:,}", f"{rate}/hour")
     metric_cols[1].metric("Station events", f"{events:,}")
-    metric_cols[2].metric("Average cycle", f"{avg_cycle:.2f} min", f"vs 8 min takt" if avg_cycle else None)
-    metric_cols[3].metric("Events over takt", f"{takt_misses:,}", help="Station events with cycle time greater than the 8-minute target.")
-    metric_cols[4].metric("Rework rate", f"{rework_pct:.1f}%", f"{int(summary.get('rework_events') or 0)} events")
+    metric_cols[2].metric("Avg cycle", f"{avg_cycle:.2f} min", "vs 8 min takt" if avg_cycle else None)
+    metric_cols[3].metric("Rework rate", f"{rework_pct:.1f}%", f"{int(summary.get('rework_events') or 0)} events")
+    st.caption(f"{takt_misses:,} of {events:,} station events exceeded the 8-minute takt target.")
 
     overview, quality_tab, downtime_tab = st.tabs(["Line overview", "Quality", "Downtime"])
     with overview:

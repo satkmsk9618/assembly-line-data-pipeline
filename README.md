@@ -1,6 +1,6 @@
 # Assembly Line Data Pipeline and Dashboard
 
-A portfolio project for learning how raw factory exports become trusted analytics. The factory is simulated: there is no real vehicle or production data. The project intentionally includes messy exports so the cleaning rules can be demonstrated and tested.
+I built an end-to-end pipeline that turns messy simulated assembly-line exports into production metrics and a live dashboard. The records are generated for this project; there is no real factory data feed.
 
 ## What this project does
 
@@ -29,7 +29,7 @@ source .venv/bin/activate
 python -m pip install -e '.[dashboard,dev]'
 ```
 
-The live demo stream starts automatically with Docker Compose and appends simulated production events every 10 seconds. You can open the dashboard immediately. The following optional batch commands generate a larger reproducible sample and load it into PostgreSQL:
+The live demo stream starts automatically with Docker Compose and appends a new simulated vehicle every 15 seconds. The dashboard also refreshes every 15 seconds. You can open it immediately. The following optional batch commands generate a larger reproducible sample and load it into PostgreSQL:
 
 ```bash
 assembly-line generate --vehicles 1000 --seed 7
@@ -39,7 +39,7 @@ assembly-line load
 
 On Windows PowerShell, create the environment with `py -m venv .venv` and activate it with `.\.venv\Scripts\Activate.ps1`, then run the same pip and `assembly-line` commands. Keep the terminal in the repository folder for every step; the project files such as `.env.example`, `docker-compose.yml`, and `pyproject.toml` are there.
 
-Open the dashboard at <http://localhost:8501> and the interactive API docs at <http://localhost:8000/docs>. The dashboard refreshes every 5, 15, or 30 seconds and includes recent throughput, cycle time versus takt, station rework, defect Pareto, and downtime views. The database initializes from `sql/schema.sql` on its first start. `docker compose down` stops the services. `docker compose down -v` also deletes the demo database and its data.
+Open the dashboard at <http://localhost:8501> and the interactive API docs at <http://localhost:8000/docs>. The dashboard refreshes every 15 seconds and includes recent throughput, cycle time versus takt, station rework, defect Pareto, and downtime views. The database initializes from `sql/schema.sql` on its first start. `docker compose down` stops the services. `docker compose down -v` also deletes the demo database and its data.
 
 The files in `data/raw/` are ignored by Git because they are generated. To keep a source checkout light, regenerate them with the command above. You can use `--vehicles` to change the sample size and `--seed` to make a repeatable alternative sample.
 
@@ -93,8 +93,8 @@ tests/               small deterministic unit tests for transformations
 - One annual time partition plus a default partition demonstrates pruning while keeping the sample easy to load. At only thousands of rows, partitioning may not improve speed; query plans decide whether it helps.
 - The loader replaces the demo facts transactionally. It is easy to rerun but unsuitable for a continuously running factory feed.
 - The API exposes health, filter-dimension, summary, and station ranking endpoints. Summary and station results can be filtered by date range, station, and shift.
-- The dashboard refreshes every 5, 15, or 30 seconds and shows throughput, takt misses, station rework, defect Pareto, and downtime.
-- A small simulator service appends clearly marked demo events every 10 seconds. It keeps the dashboard active without a real factory connection. You can change the pace with `LIVE_INTERVAL_SECONDS` in `.env`.
+- The dashboard refreshes every 15 seconds and shows throughput, takt misses, station rework, defect Pareto, and downtime.
+- A small simulator service appends clearly marked demo events every 15 seconds. It keeps the dashboard active without a real factory connection.
 
 ## SQL performance exercise
 

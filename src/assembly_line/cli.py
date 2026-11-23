@@ -1,4 +1,4 @@
-"""Command line entry point for the student project."""
+"""Command line entry point for the assembly-line pipeline."""
 import argparse
 import logging
 from pathlib import Path
