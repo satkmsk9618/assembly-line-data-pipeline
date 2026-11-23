@@ -29,6 +29,8 @@ Open the dashboard at <http://localhost:8501> and the interactive API docs at <h
 
 The files in `data/raw/` are ignored by Git because they are generated. To keep a source checkout light, regenerate them with the command above. You can use `--vehicles` to change the sample size and `--seed` to make a repeatable alternative sample.
 
+Compose publishes PostgreSQL on `localhost:5433` so it can run alongside a local PostgreSQL installation that already uses port 5432. If you change `POSTGRES_HOST_PORT` in `.env`, update the port in `DATABASE_URL` to match.
+
 ## Follow one row through the pipeline
 
 Start with `station_events.csv`. Each record reports a vehicle, station, start and end timestamp, shift, and status. The generator shuffles the records as if machine exports arrived out of order and occasionally duplicates records or removes timestamps. `transform.clean_events` parses timestamps, calculates cycle time in minutes, removes exact duplicate keys, and rejects missing timestamps and cycles of zero or less. It returns row counts so the pipeline report explains what changed.

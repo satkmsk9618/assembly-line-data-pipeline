@@ -48,7 +48,9 @@ def generate(output_dir: Path, vehicles: int = 1000, seed: int = 7) -> None:
             events.append(row.copy())
         if index % 307 == 0:
             row["start_ts"] = ""
-        if index % 401 == 0:
+        # Index 0 is also a missing-timestamp row, so don't parse its blank
+        # start time while injecting the separate negative-cycle fault.
+        if index % 401 == 0 and row["start_ts"]:
             start = datetime.fromisoformat(row["start_ts"])
             row["end_ts"] = (start - timedelta(minutes=5)).isoformat()
     rng.shuffle(events)

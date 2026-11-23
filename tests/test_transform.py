@@ -1,5 +1,6 @@
 import pandas as pd
 
+from assembly_line.generate import generate
 from assembly_line.transform import calculate_metrics, clean_events
 
 
@@ -24,3 +25,9 @@ def test_metrics_identify_station_with_longest_average_cycle():
     result = calculate_metrics(events, pd.DataFrame(), pd.DataFrame(), takt_minutes=8)
     assert result["summary"]["bottleneck_station"] == "S2"
     assert result["summary"]["first_pass_yield_pct"] == 0.0
+
+
+def test_generator_can_create_dirty_data_with_one_vehicle(tmp_path):
+    generate(tmp_path, vehicles=1, seed=7)
+    raw = pd.read_csv(tmp_path / "station_events.csv")
+    assert raw["start_ts"].isna().any()
