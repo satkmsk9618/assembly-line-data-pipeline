@@ -69,7 +69,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_downtime_natural_key
 -- The Streamlit server uses the verified Supabase Auth user ID to store one
 -- personal email preference. No password or SMTP credential is stored here.
 CREATE TABLE IF NOT EXISTS report_preference (
-    user_id TEXT PRIMARY KEY,
+    user_id UUID PRIMARY KEY,
     report_email TEXT NOT NULL,
     timezone TEXT NOT NULL DEFAULT 'UTC',
     send_hour SMALLINT NOT NULL DEFAULT 9 CHECK (send_hour BETWEEN 0 AND 23),
@@ -77,3 +77,21 @@ CREATE TABLE IF NOT EXISTS report_preference (
     last_sent_local_date DATE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Link preferences to Supabase Auth when this schema is installed there.
+-- Local Docker PostgreSQL does not include the Supabase auth schema.
+ALTER TABLE report_preference
+    ALTER COLUMN user_id TYPE UUID USING user_id::uuid;
+DO $$
+BEGIN
+    IF to_regclass('auth.users') IS NOT NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM pg_constraint
+           WHERE conrelid = 'public.report_preference'::regclass
+             AND conname = 'report_preference_user_id_fkey'
+       ) THEN
+        EXECUTE 'ALTER TABLE public.report_preference
+                 ADD CONSTRAINT report_preference_user_id_fkey
+                 FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE';
+    END IF;
+END $$;

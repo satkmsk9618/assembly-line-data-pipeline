@@ -11,7 +11,7 @@ The database remains the detailed history. The PDF is a shareable snapshot of th
 Supabase offers a free project with a PostgreSQL database and Auth. The current Free plan lists 500 MB of database storage and 50,000 monthly active users; free projects can pause after one week without activity, so it is suitable for a portfolio demo rather than a production availability promise. Check [Supabase pricing](https://supabase.com/pricing) for current limits.
 
 1. Create a Supabase project and leave email confirmation enabled in **Authentication → Providers → Email**.
-2. In Supabase **SQL Editor**, run the complete contents of `sql/schema.sql` to create the event tables, indexes, and report-preference table.
+2. In Supabase **SQL Editor**, run the complete contents of `sql/schema.sql` to create the event tables, indexes, and report-preference table. If the project already has a `report_preference` table, also run [`sql/migrations/20261123_report_preference_auth_fk.sql`](../sql/migrations/20261123_report_preference_auth_fk.sql). It changes `user_id` from text to UUID and adds a foreign key to `auth.users(id)` with `ON DELETE CASCADE`. It preserves valid existing preferences and rolls back if a preference has no matching Auth user.
 3. Copy the Project URL and anon/publishable key from **Project Settings → API**. Copy a PostgreSQL connection string from **Project Settings → Database**.
 4. In the Streamlit app's **Settings → Secrets**, set:
 
@@ -37,6 +37,6 @@ Supabase Auth is optional locally. Add the project URL and anon key to `.env` to
 
 ## Privacy and limits
 
-Passwords are handled by Supabase Auth and are not stored in the project database. The project stores each account's email, time zone, desired send hour, opt-in status, and last sent report date in `report_preference`. Event facts in this demo are shared simulated line data. A real multi-company product would add tenant ownership and authorization policies before storing customer event data.
+Passwords are handled by Supabase Auth and are not stored in the project database. Each `report_preference.user_id` is a UUID foreign key to `auth.users.id`; deleting an Auth user cascades to that user's report preference. The project stores each account's email, time zone, desired send hour, opt-in status, and last sent report date in `report_preference`. Event facts in this demo are shared simulated line data. A real multi-company product would add tenant ownership and authorization policies before storing customer event data.
 
 PostgreSQL remains the system of record. PDFs are generated on demand or by the scheduled job; the job does not create invented events to fill an empty day. A day with no records produces an honest no-data summary.

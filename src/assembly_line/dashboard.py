@@ -7,6 +7,7 @@ import secrets
 import threading
 import time
 from urllib.parse import urlencode
+from uuid import UUID
 from zoneinfo import ZoneInfo, available_timezones
 
 import pandas as pd
@@ -124,8 +125,9 @@ if auth_config:
     with st.sidebar.expander("Daily PDF email (optional)"):
         if private_db_ready:
             try:
+                auth_user_id = UUID(str(logged_in_user.id))
                 with connect() as conn:
-                    row = conn.execute("SELECT timezone, send_hour, opted_in FROM report_preference WHERE user_id=%s", (str(logged_in_user.id),)).fetchone()
+                    row = conn.execute("SELECT timezone, send_hour, opted_in FROM report_preference WHERE user_id=%s", (auth_user_id,)).fetchone()
                 preference = dict(row) if row else {}
                 zones = sorted(available_timezones())
                 saved_zone = preference.get("timezone", "UTC")
@@ -143,7 +145,7 @@ if auth_config:
                             send_hour=EXCLUDED.send_hour, opted_in=EXCLUDED.opted_in,
                             last_sent_local_date=CASE WHEN EXCLUDED.opted_in THEN report_preference.last_sent_local_date ELSE EXCLUDED.last_sent_local_date END,
                             updated_at=CURRENT_TIMESTAMP""",
-                            (str(logged_in_user.id), logged_in_user.email, selected_zone, selected_hour, opted_in, last_sent_day))
+                            (auth_user_id, logged_in_user.email, selected_zone, selected_hour, opted_in, last_sent_day))
                     st.success("Your daily report preference was saved.")
             except Exception as exc:
                 st.warning(f"Report settings need the database schema to be installed. {exc}")

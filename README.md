@@ -122,6 +122,8 @@ To deploy or update the dashboard, connect this repository to [Streamlit Communi
 
 The main fact tables store station events, quality defects, and downtime. Dimension tables describe stations, shifts, and defect types. See [`sql/schema.sql`](sql/schema.sql) and the [data dictionary](docs/data-dictionary.md) for column details.
 
+In Supabase, `report_preference.user_id` is a UUID foreign key to `auth.users.id`; deleting an Auth account removes its email-report preference. Existing Supabase projects can apply [`sql/migrations/20261123_report_preference_auth_fk.sql`](sql/migrations/20261123_report_preference_auth_fk.sql) to add the relationship. Local Docker PostgreSQL does not include Supabase's `auth` schema, so the FK is added conditionally there.
+
 - **Cycle time:** `end_ts - start_ts`, in minutes for one station event.
 - **Takt deviation:** event cycle time minus the configured target, which defaults to 8 minutes. A positive deviation means the event took longer than target.
 - **First-pass yield:** vehicles with complete records at all observed stations and no rework, divided by the vehicles in scope.
