@@ -383,16 +383,29 @@ def show_live_dashboard(window_hours: int | None, history: dict, show_all_time: 
         if downtime_frame.empty:
             show_empty("No downtime events have been recorded in this time window.")
         else:
-            by_reason = downtime_frame.groupby("reason_code", as_index=False)[["downtime_minutes"]].sum().sort_values("downtime_minutes", ascending=False)
-            top_stop = downtime_frame.sort_values("downtime_minutes", ascending=False).iloc[0]
-            st.info(f"Largest recorded stop: {top_stop['reason_code']} at {top_stop['station_id']} ({top_stop['downtime_minutes']} minutes).")
-            d_left, d_right = st.columns(2)
-            with d_left:
-                st.bar_chart(by_reason.set_index("reason_code"), y_label="Downtime (minutes)", height=300)
-            with d_right:
-                by_station = downtime_frame.groupby("station_id", as_index=False)[["downtime_minutes"]].sum().sort_values("downtime_minutes", ascending=False)
-                st.bar_chart(by_station.set_index("station_id"), y_label="Downtime (minutes)", height=300)
-            st.dataframe(downtime_frame, width="stretch", hide_index=True)
+            # Some API/database drivers return numeric aggregates as quoted
+            # strings. Convert before groupby.sum(), or Pandas concatenates
+            # them (for example, "58" + "80" becomes "5880") and Streamlit
+            # renders the axis as categories instead of minutes.
+            minutes_text = (downtime_frame["downtime_minutes"].astype("string").str.strip()
+                            .str.replace('"', "", regex=False)
+                            .str.replace("\\", "", regex=False)
+                            .str.replace(",", "", regex=False))
+            downtime_frame["downtime_minutes"] = pd.to_numeric(minutes_text, errors="coerce")
+            downtime_frame = downtime_frame.dropna(subset=["downtime_minutes"])
+            if downtime_frame.empty:
+                show_empty("Downtime records were returned, but their minute values are not numeric.")
+            else:
+                by_reason = downtime_frame.groupby("reason_code", as_index=False)[["downtime_minutes"]].sum().sort_values("downtime_minutes", ascending=False)
+                top_stop = downtime_frame.sort_values("downtime_minutes", ascending=False).iloc[0]
+                st.info(f"Largest recorded stop: {top_stop['reason_code']} at {top_stop['station_id']} ({top_stop['downtime_minutes']:.1f} minutes).")
+                d_left, d_right = st.columns(2)
+                with d_left:
+                    st.bar_chart(by_reason.set_index("reason_code")[["downtime_minutes"]], y_label="Downtime (minutes)", height=300)
+                with d_right:
+                    by_station = downtime_frame.groupby("station_id", as_index=False)[["downtime_minutes"]].sum().sort_values("downtime_minutes", ascending=False)
+                    st.bar_chart(by_station.set_index("station_id")[["downtime_minutes"]], y_label="Downtime (minutes)", height=300)
+                st.dataframe(downtime_frame, width="stretch", hide_index=True)
 
     caption = (f"Historical window: {history['start_date']} through {history['end_date']}" if history
                else "Data window: all stored records" if show_all_time
