@@ -50,7 +50,7 @@ flowchart LR
     K --> L[PDF email]
 ```
 
-The batch ETL path makes it possible to inspect raw and cleaned files. The simulator provides a continuing sample stream for the dashboard. In the local Compose setup, a separate simulator service writes to PostgreSQL every 15 seconds. In the hosted app, when `DATABASE_URL` is configured, a background simulator saves new records to PostgreSQL every 15 seconds while the app is active. Dashboard auto-refresh is off by default to keep the page available while you review it; use **Refresh dashboard now** to load the latest database values, or turn on the optional 15-second dashboard refresh.
+The batch ETL path makes it possible to inspect raw and cleaned files. The simulator provides a continuing sample stream for the dashboard. In the local Compose setup, a separate simulator service writes to PostgreSQL every 15 seconds. In the hosted app, when `DATABASE_URL` is configured, a background simulator saves new records to PostgreSQL every 15 seconds while the app is active. Recent-window dashboard auto-refresh starts paused; the **All time** view turns it on automatically so newly saved batches appear every 15 seconds. The sidebar switch can pause refreshing, and **Refresh dashboard now** loads the latest database values on demand.
 
 PostgreSQL is the history store. The dashboard’s Historical view queries that stored data for a selected date range. History begins accumulating after a database connection is configured; session-only preview events are not backfilled into PostgreSQL.
 
@@ -91,7 +91,7 @@ Wait for the services to start, then open:
 - FastAPI interactive docs: <http://localhost:8000/docs>
 - PostgreSQL: `localhost:5433` (the Compose port; the container listens on 5432)
 
-The first database start applies `sql/schema.sql`. The local simulator begins adding synthetic records every 15 seconds. Dashboard auto-refresh starts paused; click **Refresh dashboard now** when you want to query the newest rows. Turn on **Auto-refresh every 15 seconds** if you want the visible dashboard to refresh itself.
+The first database start applies `sql/schema.sql`. The local simulator begins adding synthetic records every 15 seconds. Recent-window dashboard auto-refresh starts paused; **All time** refreshes automatically every 15 seconds so it picks up new records. Use the sidebar switch to pause it or click **Refresh dashboard now** to query the newest rows manually.
 
 ### Run the batch ETL
 

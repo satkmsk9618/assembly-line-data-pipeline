@@ -205,7 +205,8 @@ with st.sidebar:
         history_filters = {"start_date": history_start.isoformat(), "end_date": history_end.isoformat()}
     auto_refresh = False
     if data_view == "Recent":
-        auto_refresh = st.toggle("Auto-refresh every 15 seconds", value=False, key="dashboard_auto_refresh_v2")
+        refresh_key = "dashboard_auto_refresh_all_time" if all_time else "dashboard_auto_refresh_recent"
+        auto_refresh = st.toggle("Auto-refresh every 15 seconds", value=all_time, key=refresh_key)
         if not auto_refresh and st.button("Refresh dashboard now"):
             st.rerun()
     else:
