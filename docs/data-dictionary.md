@@ -29,7 +29,7 @@ The generator introduces duplicate station rows, missing timestamps, negative cy
 | `dim_shift` | One row per shift name | `shift_id`, unique `shift_name` |
 | `dim_defect` | One row per defect type | `defect_id`, unique `defect_type` |
 | `fact_station_event` | One cleaned vehicle visit to one station | `vehicle_id`, station/shift keys, timestamps, cycle time, status |
-| `fact_defect` | One defect record | vehicle, station/defect keys, severity, rework flag |
+| `fact_defect` | One defect record | vehicle, station/defect keys, severity, rework flag, recorded timestamp |
 | `fact_downtime` | One downtime interval | station, timestamps, reason code |
 
 The event fact is partitioned by `start_ts`; the 2026 partition covers the generated sample and the default partition accepts other years. Its primary key includes the partition key, as PostgreSQL requires for partitioned unique constraints.

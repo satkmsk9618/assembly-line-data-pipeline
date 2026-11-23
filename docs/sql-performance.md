@@ -9,7 +9,7 @@ There is intentionally no claimed speedup in this starter: no benchmark has been
 5. Repeat each case several times and report a median. Keep machine, Docker resource limits, dataset seed, and command fixed.
 6. Inspect whether the plan actually uses an index or prunes a partition. On small tables, a sequential scan is often the sensible choice.
 
-The default schema adds indexes for event time, station plus time, shift plus status, and station-based defect/downtime lookups. The event fact has a yearly range partition and a default partition. These are teaching examples: an index has write/storage cost, and partitioning is most useful when large tables are commonly filtered by the partition key.
+The default schema adds indexes for event start/end time, station plus time, shift plus status, defect record time, and station-based defect/downtime lookups. The event fact has a yearly range partition and a default partition. These are teaching examples: an index has write/storage cost, and partitioning is most useful when large tables are commonly filtered by the partition key.
 
 Record results in this format:
 

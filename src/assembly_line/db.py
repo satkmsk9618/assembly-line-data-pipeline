@@ -25,6 +25,7 @@ def load_processed(processed_dir: Path) -> int:
     downtime = pd.read_csv(downtime_path) if downtime_path.exists() else pd.DataFrame()
     with connect() as conn:
         with conn.cursor() as cur:
+            cur.execute("ALTER TABLE fact_defect ADD COLUMN IF NOT EXISTS recorded_ts TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP")
             cur.execute("TRUNCATE fact_station_event, fact_defect, fact_downtime RESTART IDENTITY")
             for station_id in events["station_id"].dropna().unique():
                 cur.execute("INSERT INTO dim_station(station_id) VALUES (%s) ON CONFLICT DO NOTHING", (station_id,))
@@ -42,10 +43,11 @@ def load_processed(processed_dir: Path) -> int:
                 for defect_type in defects["defect_type"].dropna().unique():
                     cur.execute("INSERT INTO dim_defect(defect_type) VALUES (%s) ON CONFLICT DO NOTHING", (defect_type,))
                 for row in defects.itertuples(index=False):
-                    cur.execute("""INSERT INTO fact_defect(vehicle_id, station_id, defect_id, severity, rework_flag)
-                        SELECT %s, s.station_id, d.defect_id, %s, %s FROM dim_station s CROSS JOIN dim_defect d
+                    cur.execute("""INSERT INTO fact_defect(vehicle_id, station_id, defect_id, severity, rework_flag, recorded_ts)
+                        SELECT %s, s.station_id, d.defect_id, %s, %s, %s FROM dim_station s CROSS JOIN dim_defect d
                         WHERE s.station_id=%s AND d.defect_type=%s""",
-                        (row.vehicle_id, row.severity, bool(row.rework_flag), row.station_id, row.defect_type))
+                        (row.vehicle_id, row.severity, bool(row.rework_flag), row.recorded_ts,
+                         row.station_id, row.defect_type))
             if not downtime.empty:
                 for row in downtime.itertuples(index=False):
                     cur.execute("""INSERT INTO fact_downtime(station_id, start_ts, end_ts, reason_code)

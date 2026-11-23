@@ -31,8 +31,15 @@ CREATE TABLE IF NOT EXISTS fact_defect (
     station_id TEXT NOT NULL REFERENCES dim_station(station_id),
     defect_id BIGINT NOT NULL REFERENCES dim_defect(defect_id),
     severity TEXT NOT NULL,
-    rework_flag BOOLEAN NOT NULL DEFAULT FALSE
+    rework_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    recorded_ts TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Also upgrade existing local demo volumes when this schema is applied again.
+ALTER TABLE fact_defect ADD COLUMN IF NOT EXISTS recorded_ts TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+UPDATE fact_defect AS d SET recorded_ts = e.last_event_ts
+FROM (SELECT vehicle_id, station_id, max(end_ts) AS last_event_ts
+      FROM fact_station_event GROUP BY vehicle_id, station_id) AS e
+WHERE d.vehicle_id = e.vehicle_id AND d.station_id = e.station_id;
 CREATE TABLE IF NOT EXISTS fact_downtime (
     downtime_id BIGSERIAL PRIMARY KEY,
     station_id TEXT NOT NULL REFERENCES dim_station(station_id),
@@ -43,7 +50,10 @@ CREATE TABLE IF NOT EXISTS fact_downtime (
 
 -- Support common date-range filters and station aggregations.
 CREATE INDEX IF NOT EXISTS ix_event_start_ts ON fact_station_event (start_ts);
+CREATE INDEX IF NOT EXISTS ix_event_end_ts ON fact_station_event (end_ts);
 CREATE INDEX IF NOT EXISTS ix_event_station_start ON fact_station_event (station_id, start_ts);
 CREATE INDEX IF NOT EXISTS ix_event_shift_status ON fact_station_event (shift_id, status);
 CREATE INDEX IF NOT EXISTS ix_defect_station ON fact_defect (station_id);
+CREATE INDEX IF NOT EXISTS ix_defect_recorded_ts ON fact_defect (recorded_ts);
 CREATE INDEX IF NOT EXISTS ix_downtime_station_start ON fact_downtime (station_id, start_ts);
+CREATE INDEX IF NOT EXISTS ix_downtime_end_ts ON fact_downtime (end_ts);
