@@ -110,6 +110,11 @@ if auth_config:
                 st.warning(f"Report settings need the database schema to be installed. {exc}")
         else:
             st.info("Connect PostgreSQL to save your report preference. Email reports are optional.")
+else:
+    st.sidebar.info(
+        "To set up daily email reports, add SUPABASE_URL and SUPABASE_ANON_KEY "
+        "in this app's Streamlit secrets, then create an account or sign in."
+    )
 
 st.title("🚗 Assembly Line Control Room")
 st.caption("A live operations view backed by a clearly labeled simulated event stream.")
